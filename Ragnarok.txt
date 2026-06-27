@@ -1,0 +1,29 @@
+You are an expert game developer, programmer, UI/UX designer, and software architect. Design me the most advanced and effective aimbot possible for an offline shooter sandbox game that I programmed, similar to strategic shooter games like Valorant. This is purely for fun and experimentation in a safe environment. The program should be called Ragnarok. You must consider every possible factor, such as the fact that there are so many abilities and other interference in the game that it is easy for enemies to be occluded, false positives, etc., locking onto enemies vs. teammates (enemies have a purple/red/yellow colored outline, which is configurable based on color blindness settings), and so on. Do research first. For object detection, use RF-DETR and include a training pipeline for it. Integrate trackers like DeepSORT, BoT-SORT, and ByteTrack so you can keep track of the different enemies. Make sure target selection is smart. It should be easy to switch from enemy to enemy. It should be smooth and seamless. Include multiple methods aiming methods, such as the ones below (based off of another AI Aimbot from the following URL: https://github.com/AccessViolationEnjoyer/NeuralBot):
+
+Flick Aimer
+The flick aimer smoothly acquires the position of the target and smoothly moves the crosshair towards that position. The position is not updated over time so as to track any movements that the target makes. If calibrated correctly, the flick aimer should always hit a stationary target. It also shouldn't suffer from dropped detections, since the position is acquired once. The obvious disadvantage is that it is likely to miss a quickly moving target unless the speed is set to a very high value.
+
+Feedback Aimer
+The feedback aimer uses feedback control logic to continuously move the crosshair towards the target. You can configure this aimer to use Proportional (P), Proportional Integral (PI) or Proportional Integral Derivative (PID) control. Whilst this method allows tracking moving objects quite well, it usually tracks slightly behind fast moving objects. It may also be difficult to tune the control parameters.
+
+Hybrid Aimer
+The hybrid aimer combines features of the other two aimers. It uses simple proportional feedback control to get close to the target. Once the target is sufficiently close, it performs a final flick in order to increase the probability of hitting the target. This method is most suitable for low rate of fire weapons, such as sniper rifles.
+
+Trigger Bot
+The trigger bot can automate the process of clicking a mouse button. The included trigger bot can be configured to click the mouse button when the target is sufficiently close. It can be used stand-alone, without any aim assistance.
+
+Predictive Aimer
+Use track velocity + game tick extrapolation to lead targets (essential for fast movers/projectiles).
+
+Humanized Smoothing
+Add perlin noise or bezier curves + variable speed based on distance/angle for natural feel. See Windmouse: https://pypi.org/project/windmouse/
+
+Recoil Compensation
+Pattern-based or dynamic (detect muzzle flash via CV) vertical/horizontal compensation.
+
+FOV Aim
+Only activate within configurable FOV cone.
+
+To interact with the mouse, provide options to either perform mouse injection or use an Arduino UNO R4 + a USB Host Shield as a HID device. Use the most efficient screen grabbing method possible, such as NVIDIA NVFBC / AMD AMF. Add any other features you found would be helpful, improve QOL, or otherwise recommend. 
+
+Create a modern, professional GUI with PySide6, including any settings that would need to be tweaked. The GUI should be designed with the UI UX Pro Max skill.
