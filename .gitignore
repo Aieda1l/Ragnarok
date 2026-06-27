@@ -1,0 +1,55 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+.venv/
+venv/
+env/
+*.so
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Model weights / exported engines (large binaries)
+*.pt
+*.pth
+*.onnx
+*.engine
+*.trt
+*.plan
+*.calib
+*.cache
+
+# Datasets / captured frames / recordings
+data/
+datasets/
+captures/
+recordings/
+*.mp4
+*.avi
+*.mkv
+
+# Build / packaging
+build/
+dist/
+*.spec
+
+# Logs / profiling / telemetry dumps
+logs/
+*.log
+*.prof
+
+# Arduino build artifacts
+*.hex
+*.elf
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Claude Code local settings (machine-specific)
+.claude/settings.local.json
