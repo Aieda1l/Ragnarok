@@ -14,6 +14,7 @@ dependencies = [
     "bettercam>=1.0; sys_platform == 'win32'",
     "mss>=9.0",
     "supervision>=0.20",
+    "opencv-python>=4.9",
     # rfdetr + torch are installed separately per environment (CUDA build); see README.
 ]
 
