@@ -37,3 +37,21 @@ def test_seq_increments():
     loop = WorkerLoop(_Cap(), _Det(), StageProfiler(), pub)
     loop.tick(); loop.tick()
     assert pub.latest().seq == 2
+
+def test_tick_publishes_tracks_from_injected_tracker():
+    from ragnarok.core.types import Track, Tracks
+    class _Trk:
+        def update(self, detections, ego_affine=None):
+            return Tracks(items=(Track(track_id=42, xyxy=(0, 0, 10, 10),
+                                       confidence=0.9, class_id=0),))
+    pub = SnapshotPublisher()
+    loop = WorkerLoop(_Cap(), _Det(), StageProfiler(), pub, tracker=_Trk())
+    loop.tick()
+    snap = pub.latest()
+    assert len(snap.tracks) == 1 and snap.tracks[0].track_id == 42
+
+def test_profiler_has_track_and_classify_stages():
+    pub = SnapshotPublisher()
+    prof = StageProfiler()
+    WorkerLoop(_Cap(), _Det(), prof, pub).tick()
+    assert "track" in prof.stages() and "classify" in prof.stages()

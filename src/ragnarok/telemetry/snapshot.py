@@ -1,6 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass
 import numpy as np
+from ragnarok.core.types import Track
 
 @dataclass(frozen=True)
 class TelemetrySnapshot:
@@ -10,6 +11,7 @@ class TelemetrySnapshot:
     detection_count: int
     preview: np.ndarray | None   # small BGR image for the GUI, or None
     seq: int
+    tracks: tuple[Track, ...] = ()  # Phase 2; default keeps Phase 1 callers working
 
 class SnapshotPublisher:
     """Single-writer (worker) / single-reader (GUI). publish() rebinds one
