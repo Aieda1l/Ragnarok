@@ -1,3 +1,6 @@
+"""Tests for Phase 4 config schema: AimConfig, MotionConfig, RecoilConfig, TriggerConfig."""
+from __future__ import annotations
+
 import pytest
 from pydantic import ValidationError
 from ragnarok.config.schema import (

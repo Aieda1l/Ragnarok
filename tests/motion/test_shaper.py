@@ -1,3 +1,6 @@
+"""Tests for NullShaper and WindMouseShaper motion-shaping behaviour."""
+from __future__ import annotations
+
 import math
 import random
 from ragnarok.motion.shaper import NullShaper, WindMouseShaper

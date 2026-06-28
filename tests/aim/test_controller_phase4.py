@@ -1,4 +1,6 @@
-# tests/aim/test_controller_phase4.py
+"""Phase 4 AimController integration tests: trigger, recoil, target switching."""
+from __future__ import annotations
+
 from ragnarok.core.types import Track, Tracks, Team
 from ragnarok.config.schema import AimConfig
 from ragnarok.aim.controller import AimController
@@ -53,6 +55,30 @@ def test_trigger_fires_and_advances_recoil():
     )
     ac.update(Tracks((enemy,)), 0)
     assert (MouseButton.LEFT, True) in mouse.buttons   # trigger fired
+    assert rc._idx > 0                                 # recoil advanced on fire
+
+
+def test_target_switch_releases_trigger():
+    """_reset_stateful runs on target switch, releasing the trigger."""
+    cfg = AimConfig(enabled=True)
+    mouse = NullMouseDriver(); mouse.connect()
+    # Two enemies both covering the crosshair (ROI centre = 192, 192).
+    e1 = _enemy(tid=1, xyxy=(150.0, 150.0, 240.0, 260.0))
+    e2 = _enemy(tid=2, xyxy=(150.0, 150.0, 240.0, 260.0))
+    trig = TriggerBot(mouse=mouse, activation_delay_s=0.0, clock=lambda: 0)
+    ac = AimController(
+        cfg, selector=_selector(), imm_manager=IMMManager(),
+        aimer=FeedbackAimer(kp=0.5, max_step_px=500.0, ema_alpha=1.0),
+        mouse=mouse, is_aim_active=lambda: True, roi_size=384,
+        shaper=NullShaper(), trigger=trig, trigger_active=lambda: True,
+        clock=lambda: 0,
+    )
+    # Frame 1: only e1 present → selected, trigger fires.
+    ac.update(Tracks((e1,)), 0)
+    assert (MouseButton.LEFT, True) in mouse.buttons
+    # Frame 2: only e2 present → selector switches to tid=2 → _reset_stateful → release.
+    ac.update(Tracks((e2,)), 8_000_000)
+    assert (MouseButton.LEFT, False) in mouse.buttons
 
 
 def test_disengage_releases_trigger():

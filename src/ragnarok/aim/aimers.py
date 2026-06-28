@@ -178,10 +178,12 @@ class FeedbackAimer(Aimer):
         dx = self._kp * self._fx + self._kff * target_vel[0] * dt
         dy = self._kp * self._fy + self._kff * target_vel[1] * dt
 
-        # Magnitude clamp: preserve direction, cap magnitude.
+        # Magnitude clamp: never overshoot remaining distance OR max step.
         mag = math.hypot(dx, dy)
-        if mag > self._max and mag > 0.0:
-            scale = self._max / mag
+        d = math.hypot(ex, ey)              # remaining distance to target
+        limit = min(self._max, d)           # never overshoot remaining distance OR max step
+        if mag > limit and mag > 0.0:
+            scale = limit / mag
             dx *= scale
             dy *= scale
 
@@ -200,6 +202,8 @@ class HybridAimer(Aimer):
     error magnitude <= flick_dist_px: snap the full remaining error (clamped to
                                       the remaining distance, so no overshoot) —
                                       crisp final settle for snipers / low ROF.
+
+    Position-only: ignores ``target_vel``; ``flick_speed_px_s`` is reserved/unused.
     """
 
     def __init__(

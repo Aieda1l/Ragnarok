@@ -1,3 +1,6 @@
+"""Tests for TriggerBot activation delay, gating, and hold/release behaviour."""
+from __future__ import annotations
+
 from ragnarok.core.types import Track, Team
 from ragnarok.aim.mouse import NullMouseDriver, MouseButton
 from ragnarok.trigger.bot import TriggerBot

@@ -1,3 +1,6 @@
+"""Tests for VelocitySmoother EMA + clamp behaviour."""
+from __future__ import annotations
+
 import math
 from ragnarok.aim.velocity import VelocitySmoother
 

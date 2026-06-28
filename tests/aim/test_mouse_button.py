@@ -1,4 +1,6 @@
-# tests/aim/test_mouse_button.py
+"""Tests for SendInputMouseDriver button-flag encoding (LEFT/RIGHT down/up)."""
+from __future__ import annotations
+
 from ragnarok.aim.mouse import (
     SendInputMouseDriver, MouseButton,
     MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP,

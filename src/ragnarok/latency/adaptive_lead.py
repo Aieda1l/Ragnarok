@@ -17,6 +17,12 @@ class AdaptiveLead:
         return self._lat
 
     def observe_actuation(self, latency_s: float) -> None:
+        """Record a measured actuation latency sample (EWMA update).
+
+        NOTE: not yet called by the controller in Phase 4.  The live lead
+        currently = frame_age + static base_latency_s.  Wire this when an
+        actuation-timing source (e.g. USB HID interrupt echo) exists.
+        """
         self._lat += self._alpha * (latency_s - self._lat)
 
     def lead_seconds(self, t_capture_ns: int, now_ns: int) -> float:

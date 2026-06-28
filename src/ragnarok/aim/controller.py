@@ -108,6 +108,9 @@ class AimController:
         sx, sy = self._shaper.shape(dpx, dpy)
 
         # trigger + recoil
+        # NOTE: recoil only advances on a NEW trigger-bot press (semi-auto).
+        # Per-burst/held-fire recoil and manual-fire (trigger-disabled) recoil
+        # are deferred (Phase 5).
         if self._trigger is not None:
             fired = self._trigger.update(
                 track=track,

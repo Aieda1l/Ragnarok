@@ -132,14 +132,19 @@ def test_feedback_diagonal_clamp():
 
 
 def test_feedback_ema_smooths_error():
-    """With ema_alpha=0.5, second call EMA blends from seeded value toward 0."""
+    """EMA blends from seeded value; the remaining-distance clamp caps the output.
+
+    Frame 2 has the target at the crosshair (d=0), so the no-overshoot clamp
+    correctly returns 0 even though the EMA carries residual state of 50.
+    This is the right behaviour: we are already at the target.
+    """
     a = FeedbackAimer(kp=1.0, max_step_px=1e9, ema_alpha=0.5)
-    # First call: seeds EMA at error=100 → dx=100
+    # First call: seeds EMA at error=100 → dx=100 (d=100, limit=100, no clamp).
     dx, _ = a.step((0.0, 0.0), (100.0, 0.0), dt=0.016)
     assert abs(dx - 100.0) < 1e-6, f"First frame: expected 100, got {dx}"
-    # Second call: error=0, EMA = 100 + 0.5*(0-100) = 50 → dx=50
+    # Second call: target at crosshair (d=0) → remaining-distance clamp returns 0.
     dx2, _ = a.step((0.0, 0.0), (0.0, 0.0), dt=0.016)
-    assert abs(dx2 - 50.0) < 1e-6, f"EMA second frame: expected 50, got {dx2}"
+    assert abs(dx2) < 1e-9, f"At target (d=0) output must be 0; got {dx2}"
 
 
 def test_feedback_ema_alpha_1_no_smoothing():

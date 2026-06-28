@@ -1,3 +1,6 @@
+"""Tests for RecoilPattern + RecoilCompensator spray-counter logic."""
+from __future__ import annotations
+
 from ragnarok.recoil.compensator import RecoilPattern, RecoilCompensator
 
 
