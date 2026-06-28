@@ -33,6 +33,8 @@ MOUSEEVENTF_LEFTDOWN: int = 0x0002
 MOUSEEVENTF_LEFTUP: int = 0x0004
 MOUSEEVENTF_RIGHTDOWN: int = 0x0008
 MOUSEEVENTF_RIGHTUP: int = 0x0010
+MOUSEEVENTF_MIDDLEDOWN: int = 0x0020
+MOUSEEVENTF_MIDDLEUP: int = 0x0040
 
 # ---------------------------------------------------------------------------
 # ctypes structs — exact field order/types matching winuser.h
@@ -247,10 +249,15 @@ class SendInputMouseDriver(MouseDriver):
         iy = max(-self._max, min(self._max, iy))
         self._send(ix, iy, MOUSEEVENTF_MOVE)  # RELATIVE: no ABSOLUTE flag
 
+    _BUTTON_FLAGS = {
+        MouseButton.LEFT: (MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP),
+        MouseButton.RIGHT: (MOUSEEVENTF_RIGHTDOWN, MOUSEEVENTF_RIGHTUP),
+        MouseButton.MIDDLE: (MOUSEEVENTF_MIDDLEDOWN, MOUSEEVENTF_MIDDLEUP),
+    }
+
     def set_button(self, button: MouseButton, down: bool) -> None:
-        # DEFERRED to Phase 4 (trigger bot).
-        # Would emit MOUSEEVENTF_LEFTDOWN/UP via the same INPUT/MOUSEINPUT structs.
-        raise NotImplementedError("buttons deferred to Phase 4 trigger bot")
+        down_flag, up_flag = self._BUTTON_FLAGS[button]
+        self._send(0, 0, down_flag if down else up_flag)
 
 
 # ---------------------------------------------------------------------------
