@@ -74,3 +74,29 @@ def test_single_press_held_not_repeated():
     assert bot.update(**_gates()) is True           # first press
     clk.t = 200_000_000
     assert bot.update(**_gates()) is False          # still held, no new shot
+
+
+def test_no_fire_when_enemy_not_confirmed():
+    bot, mouse, clk = _bot(delay_s=0.0)
+    assert bot.update(**_gates(enemy_confirmed=False)) is False
+    assert mouse.buttons == []
+
+
+def test_timer_resets_after_gate_drop():
+    bot, mouse, clk = _bot(delay_s=0.1)
+    clk.t = 80_000_000                     # 80 ms — below threshold
+    assert bot.update(**_gates()) is False  # eligible, not yet fired
+    bot.update(**_gates(active=False))      # gate drops — timer must reset
+    clk.t = 140_000_000                    # +60 ms from drop — new window not yet satisfied
+    assert bot.update(**_gates()) is False  # must NOT fire
+    clk.t = 250_000_000                    # +170 ms from drop — full delay satisfied
+    assert bot.update(**_gates()) is True   # now fires
+
+
+def test_explicit_release():
+    bot, mouse, clk = _bot(delay_s=0.0)
+    bot.update(**_gates())                          # press
+    bot.release()                                   # explicit release
+    assert (MouseButton.LEFT, False) in mouse.buttons
+    clk.t = 1_000_000_000
+    assert bot.update(**_gates()) is True           # fires again after release
