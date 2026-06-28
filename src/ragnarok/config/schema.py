@@ -16,6 +16,7 @@ class DetectionConfig(BaseModel):
     backend: Literal["rfdetr_torch"] = "rfdetr_torch"
     model: Literal["nano", "small", "medium", "large"] = "small"  # Apache-2.0 variants only
     confidence: float = Field(default=0.5, ge=0.0, le=1.0)
+    optimize_fp16: bool = True   # fuse + FP16 the auto-built model (~order-of-magnitude on Ampere)
 
 
 class AimConfig(BaseModel):
