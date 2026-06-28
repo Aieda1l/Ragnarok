@@ -33,6 +33,8 @@ class NullShaper(MotionShaper):
 
 
 class WindMouseShaper(MotionShaper):
+    """Per-frame WindMouse shaper: momentum + wind + gravity for human-like curves."""
+
     def __init__(
         self,
         *,
