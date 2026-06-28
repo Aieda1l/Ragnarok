@@ -9,6 +9,7 @@ from ragnarok.detection.factory import create_detector
 from ragnarok.latency.profiler import StageProfiler
 from ragnarok.telemetry.snapshot import SnapshotPublisher
 from ragnarok.worker.loop import WorkerLoop
+from ragnarok.wiring import build_tracker, build_classifier
 from ragnarok.gui.worker_thread import WorkerThread
 from ragnarok.gui.main_window import MainWindow
 
@@ -19,10 +20,10 @@ def _config_path() -> Path:
 def _build_aim_controller(cfg):
     """Build the AimController from cfg.aim (Windows-only deps imported lazily).
 
-    NOTE: AimController is ENEMY-only; for it to engage live you must also wire a
-    friend/foe classifier that labels enemies (HSVRingClassifier + an enemy-color
-    config) — a small follow-up, since the worker currently defaults to
-    NullClassifier/IdentityTracker.
+    AimController is ENEMY-only; enemies are labelled by the friend/foe classifier
+    built from cfg.classification (see build_classifier) and tracked with stable
+    ids by the tracker from cfg.tracking (see build_tracker), both wired into the
+    WorkerLoop in main().
     """
     from ragnarok.aim.mouse import SendInputMouseDriver
     from ragnarok.aim.keys import AsyncKeyStateProvider, make_aim_active
@@ -55,7 +56,9 @@ def main() -> int:
     aim_controller = _build_aim_controller(cfg) if cfg.aim.enabled else None
     loop = WorkerLoop(
         create_capturer(cfg.capture), create_detector(cfg.detection),
-        StageProfiler(), publisher, aim_controller=aim_controller,
+        StageProfiler(), publisher,
+        tracker=build_tracker(cfg), classifier=build_classifier(cfg),
+        aim_controller=aim_controller,
     )
     worker = WorkerThread(loop)
     window = MainWindow(publisher)
