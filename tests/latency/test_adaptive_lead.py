@@ -1,3 +1,6 @@
+"""Tests for AdaptiveLead frame-age + EWMA latency estimation."""
+from __future__ import annotations
+
 from ragnarok.latency.adaptive_lead import AdaptiveLead
 
 
