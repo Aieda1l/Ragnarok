@@ -1,0 +1,81 @@
+"""Tests for HybridAimer, PredictiveAimer, and related aimer behaviour."""
+from __future__ import annotations
+
+import math
+
+from ragnarok.aim.aimers import NullAimer, FlickAimer, FeedbackAimer, HybridAimer, PredictiveAimer
+
+
+def test_all_aimers_accept_target_vel_kwarg():
+    # Uniform signature so the controller can always pass velocity.
+    assert NullAimer().step((0, 0), (10, 0), 0.01, target_vel=(5.0, 0.0)) == (0.0, 0.0)
+    fl = FlickAimer(flick_speed_px_s=1000.0)
+    dx, dy = fl.step((0, 0), (10, 0), 0.01, target_vel=(5.0, 0.0))
+    assert dx > 0 and dy == 0
+    fb = FeedbackAimer(kp=0.5, max_step_px=100.0, ema_alpha=1.0)
+    dx, dy = fb.step((0, 0), (10, 0), 0.01, target_vel=(0.0, 0.0))
+    assert dx > 0
+
+
+def test_hybrid_far_is_proportional_not_full():
+    a = HybridAimer(kp=0.3, max_step_px=100.0, flick_dist_px=20.0,
+                    flick_speed_px_s=4000.0, ema_alpha=1.0)
+    dx, dy = a.step((0.0, 0.0), (200.0, 0.0), 0.01)   # error 200 >> flick_dist
+    assert 0 < dx < 200.0          # proportional: a fraction of the error
+    assert abs(dx - 0.3 * 200.0) < 1e-6
+
+
+def test_hybrid_close_snaps_full_error():
+    a = HybridAimer(kp=0.3, max_step_px=100.0, flick_dist_px=20.0,
+                    flick_speed_px_s=4000.0, ema_alpha=1.0)
+    dx, dy = a.step((0.0, 0.0), (5.0, 0.0), 0.01)     # error 5 < flick_dist
+    assert abs(dx - 5.0) < 1e-6 and abs(dy) < 1e-6    # full snap, no overshoot
+
+
+def test_hybrid_never_overshoots_close():
+    a = HybridAimer(kp=2.0, max_step_px=1000.0, flick_dist_px=20.0,
+                    flick_speed_px_s=4000.0, ema_alpha=1.0)
+    dx, dy = a.step((0.0, 0.0), (10.0, 0.0), 0.01)
+    assert 0 < dx <= 10.0 + 1e-9
+
+
+def test_hybrid_far_regime_never_overshoots_high_kp():
+    # kp>1 in the far regime must still not overshoot the remaining distance.
+    import math
+    a = HybridAimer(kp=2.0, max_step_px=1000.0, flick_dist_px=20.0,
+                    flick_speed_px_s=4000.0, ema_alpha=1.0)
+    dx, dy = a.step((0.0, 0.0), (25.0, 0.0), 0.01)   # error 25 > flick_dist 20 -> far branch
+    assert 0 < dx <= 25.0 + 1e-9 and abs(dy) < 1e-6
+
+
+def test_hybrid_far_regime_max_step_clamp():
+    a = HybridAimer(kp=1.0, max_step_px=5.0, flick_dist_px=20.0,
+                    flick_speed_px_s=4000.0, ema_alpha=1.0)
+    dx, dy = a.step((0.0, 0.0), (200.0, 0.0), 0.01)  # error 200, kp=1 -> 200 clamped to max_step 5
+    assert abs(math.hypot(dx, dy) - 5.0) < 1e-6
+
+
+def test_predictive_snaps_full_error_when_no_velocity():
+    a = PredictiveAimer(max_step_px=1000.0, kff=1.0)
+    dx, dy = a.step((0.0, 0.0), (30.0, 0.0), 0.01, target_vel=(0.0, 0.0))
+    assert abs(dx - 30.0) < 1e-6 and abs(dy) < 1e-6
+
+
+def test_predictive_adds_velocity_feedforward():
+    a = PredictiveAimer(max_step_px=1000.0, kff=1.0)
+    # zero positional error, but target moving right at 500 px/s over dt=0.01 -> +5 px FF
+    dx, dy = a.step((0.0, 0.0), (0.0, 0.0), 0.01, target_vel=(500.0, 0.0))
+    assert abs(dx - 5.0) < 1e-6
+
+
+def test_predictive_magnitude_clamped():
+    a = PredictiveAimer(max_step_px=10.0, kff=1.0)
+    dx, dy = a.step((0.0, 0.0), (100.0, 0.0), 0.01)
+    assert abs(math.hypot(dx, dy) - 10.0) < 1e-6
+
+
+def test_feedback_far_regime_no_overshoot_high_kp():
+    from ragnarok.aim.aimers import FeedbackAimer
+    a = FeedbackAimer(kp=2.0, max_step_px=1000.0, ema_alpha=1.0)
+    dx, dy = a.step((0.0, 0.0), (25.0, 0.0), 0.01)   # kp*25=50 would overshoot 25
+    assert 0 < dx <= 25.0 + 1e-9 and abs(dy) < 1e-6

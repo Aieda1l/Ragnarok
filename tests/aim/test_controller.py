@@ -68,7 +68,7 @@ def test_target_switch_resets_aimer():
     class _Rec(Aimer):
         def __init__(self):
             self.resets = 0
-        def step(self, crosshair, target_point, dt):
+        def step(self, crosshair, target_point, dt, target_vel=(0.0, 0.0)):
             return (1.0, 0.0)
         def reset(self):
             self.resets += 1
