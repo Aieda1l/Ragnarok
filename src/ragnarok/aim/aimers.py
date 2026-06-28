@@ -35,6 +35,7 @@ class Aimer(ABC):
         crosshair: tuple[float, float],
         target_point: tuple[float, float],
         dt: float,
+        target_vel: tuple[float, float] = (0.0, 0.0),
     ) -> tuple[float, float]:
         """Return (dx, dy) pixel delta to apply this frame.
 
@@ -42,6 +43,8 @@ class Aimer(ABC):
             crosshair:    Current crosshair position in ROI pixel space.
             target_point: Desired aim point in ROI pixel space.
             dt:           Frame duration in seconds (clamped by caller).
+            target_vel:   IMM velocity estimate (px/s) for feed-forward aimers;
+                          aimers that don't use it must accept and ignore it.
 
         Returns:
             (dx, dy) — signed pixel deltas, never causing an overshoot.
@@ -63,6 +66,7 @@ class NullAimer(Aimer):
         crosshair: tuple[float, float],
         target_point: tuple[float, float],
         dt: float,
+        target_vel: tuple[float, float] = (0.0, 0.0),
     ) -> tuple[float, float]:
         return (0.0, 0.0)
 
@@ -94,6 +98,7 @@ class FlickAimer(Aimer):
         crosshair: tuple[float, float],
         target_point: tuple[float, float],
         dt: float,
+        target_vel: tuple[float, float] = (0.0, 0.0),
     ) -> tuple[float, float]:
         # Latch target_point on first call after reset (or construction).
         if self._latched is None:
@@ -173,11 +178,123 @@ class FeedbackAimer(Aimer):
         dx = self._kp * self._fx + self._kff * target_vel[0] * dt
         dy = self._kp * self._fy + self._kff * target_vel[1] * dt
 
-        # Magnitude clamp: preserve direction, cap magnitude.
+        # Magnitude clamp: never overshoot remaining distance OR max step.
         mag = math.hypot(dx, dy)
-        if mag > self._max and mag > 0.0:
-            scale = self._max / mag
+        d = math.hypot(ex, ey)              # remaining distance to target
+        limit = min(self._max, d)           # never overshoot remaining distance OR max step
+        if mag > limit and mag > 0.0:
+            scale = limit / mag
             dx *= scale
             dy *= scale
 
+        return (dx, dy)
+
+
+# ---------------------------------------------------------------------------
+# HybridAimer
+# ---------------------------------------------------------------------------
+
+class HybridAimer(Aimer):
+    """Proportional approach far out, full flick when close.
+
+    error magnitude > flick_dist_px : smooth P-controller (EMA error, clamped
+                                      to max_step_px) — covers long travel.
+    error magnitude <= flick_dist_px: snap the full remaining error (clamped to
+                                      the remaining distance, so no overshoot) —
+                                      crisp final settle for snipers / low ROF.
+
+    Position-only: ignores ``target_vel``; ``flick_speed_px_s`` is reserved/unused.
+    """
+
+    def __init__(
+        self,
+        *,
+        kp: float,
+        max_step_px: float,
+        flick_dist_px: float,
+        flick_speed_px_s: float,
+        ema_alpha: float = 1.0,
+    ) -> None:
+        self._kp = kp
+        self._max = max_step_px
+        self._flick_dist = flick_dist_px
+        self._speed = flick_speed_px_s
+        self._alpha = ema_alpha
+        self._fx = 0.0
+        self._fy = 0.0
+        self._initialized = False
+
+    def reset(self) -> None:
+        self._initialized = False
+
+    def step(
+        self,
+        crosshair: tuple[float, float],
+        target_point: tuple[float, float],
+        dt: float,
+        target_vel: tuple[float, float] = (0.0, 0.0),
+    ) -> tuple[float, float]:
+        ex = target_point[0] - crosshair[0]
+        ey = target_point[1] - crosshair[1]
+        d = math.hypot(ex, ey)
+        if d <= 1e-9:
+            return (0.0, 0.0)
+
+        if d <= self._flick_dist:
+            # Close: snap the full remaining error (already <= flick_dist, no clamp needed).
+            self._initialized = False  # next far-approach re-seeds the EMA
+            return (ex, ey)
+
+        # Far: smooth proportional approach.
+        if not self._initialized:
+            self._fx, self._fy = ex, ey
+            self._initialized = True
+        else:
+            a = self._alpha
+            self._fx += a * (ex - self._fx)
+            self._fy += a * (ey - self._fy)
+        dx = self._kp * self._fx
+        dy = self._kp * self._fy
+        mag = math.hypot(dx, dy)
+        limit = min(self._max, d)          # never exceed remaining distance OR max step
+        if mag > limit and mag > 0.0:
+            s = limit / mag
+            dx *= s
+            dy *= s
+        return (dx, dy)
+
+
+# ---------------------------------------------------------------------------
+# PredictiveAimer
+# ---------------------------------------------------------------------------
+
+class PredictiveAimer(Aimer):
+    """Crisp predicted-point aimer with velocity feed-forward.
+
+    The controller feeds the IMM lead point as target_point and v̂ as
+    target_vel. This aimer commands the full positional error to that predicted
+    point (no smoothing) plus kff * v̂ * dt, magnitude-clamped to max_step_px.
+    Best for fast, confidently-tracked targets where prediction beats damping.
+    """
+
+    def __init__(self, *, max_step_px: float, kff: float = 1.0) -> None:
+        self._max = max_step_px
+        self._kff = kff
+
+    def step(
+        self,
+        crosshair: tuple[float, float],
+        target_point: tuple[float, float],
+        dt: float,
+        target_vel: tuple[float, float] = (0.0, 0.0),
+    ) -> tuple[float, float]:
+        ex = target_point[0] - crosshair[0]
+        ey = target_point[1] - crosshair[1]
+        dx = ex + self._kff * target_vel[0] * dt
+        dy = ey + self._kff * target_vel[1] * dt
+        mag = math.hypot(dx, dy)
+        if mag > self._max and mag > 0.0:
+            s = self._max / mag
+            dx *= s
+            dy *= s
         return (dx, dy)
