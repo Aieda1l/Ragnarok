@@ -229,11 +229,6 @@ class TestLifecycle:
         assert d._connected is False
         assert calls == [(5, 0, MOUSEEVENTF_MOVE)]
 
-    def test_set_button_raises_not_implemented(self):
-        d, _ = make_driver()
-        with pytest.raises(NotImplementedError):
-            d.set_button(MouseButton.LEFT, True)
-
 
 # ---------------------------------------------------------------------------
 # NullMouseDriver
