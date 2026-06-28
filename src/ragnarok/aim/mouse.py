@@ -46,7 +46,12 @@ MOUSEEVENTF_MIDDLEUP: int = 0x0040
 try:
     from ctypes import wintypes
 
-    ULONG_PTR = wintypes.ULONG_PTR  # c_ulong (32-bit) / c_ulonglong (64-bit)
+    # wintypes.ULONG_PTR was removed in Python 3.9+; fall back to c_size_t
+    # which is always the pointer-sized unsigned integer on the current platform.
+    try:
+        ULONG_PTR = wintypes.ULONG_PTR  # type: ignore[attr-defined]
+    except AttributeError:
+        ULONG_PTR = ctypes.c_size_t
 
     class MOUSEINPUT(ctypes.Structure):
         _fields_ = [
