@@ -1,5 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass
+from enum import Enum
 import numpy as np
 
 @dataclass(frozen=True)
@@ -31,4 +32,49 @@ class Detections:
 
     @classmethod
     def empty(cls) -> "Detections":
+        return cls(items=())
+
+
+class Team(str, Enum):
+    UNKNOWN = "unknown"
+    ENEMY = "enemy"
+    TEAMMATE = "teammate"
+
+
+@dataclass(frozen=True)
+class Track:
+    track_id: int
+    xyxy: tuple[float, float, float, float]
+    confidence: float
+    class_id: int
+    team: Team = Team.UNKNOWN
+    age: int = 0
+    hits: int = 0
+    time_since_update: int = 0
+
+    @property
+    def center(self) -> tuple[float, float]:
+        x1, y1, x2, y2 = self.xyxy
+        return ((x1 + x2) / 2.0, (y1 + y2) / 2.0)
+
+    @classmethod
+    def from_detection(cls, det: "Detection", track_id: int, *, team: "Team" = Team.UNKNOWN,
+                       age: int = 0, hits: int = 1, time_since_update: int = 0) -> "Track":
+        return cls(track_id=track_id, xyxy=det.xyxy, confidence=det.confidence,
+                   class_id=det.class_id, team=team, age=age, hits=hits,
+                   time_since_update=time_since_update)
+
+
+@dataclass(frozen=True)
+class Tracks:
+    items: tuple[Track, ...] = ()
+
+    def __len__(self) -> int:
+        return len(self.items)
+
+    def __iter__(self):
+        return iter(self.items)
+
+    @classmethod
+    def empty(cls) -> "Tracks":
         return cls(items=())
