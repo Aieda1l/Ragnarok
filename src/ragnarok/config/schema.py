@@ -40,8 +40,32 @@ class AimConfig(BaseModel):
     lead_ms: float = Field(default=40.0, ge=0.0, le=500.0)
 
 
+class TrackingConfig(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    backend: Literal["botsort", "identity"] = "botsort"
+    track_high_thresh: float = Field(default=0.6, ge=0.0, le=1.0)
+    track_low_thresh: float = Field(default=0.1, ge=0.0, le=1.0)
+    new_track_thresh: float = Field(default=0.7, ge=0.0, le=1.0)
+    track_buffer: int = Field(default=30, ge=1, le=600)
+    match_thresh: float = Field(default=0.8, ge=0.0, le=1.0)
+    proximity_thresh: float = Field(default=0.5, ge=0.0, le=1.0)
+
+
+class ClassificationConfig(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    enabled: bool = True
+    palette: Literal["default", "wong"] = "default"
+    enemy_color: str = "red"                  # key within the chosen palette
+    frac_threshold: float = Field(default=0.18, ge=0.0, le=1.0)
+    thickness: int = Field(default=4, ge=1, le=64)
+    vote_window: int = Field(default=5, ge=1, le=120)
+    vote_min: int = Field(default=3, ge=1, le=120)
+
+
 class AppConfig(BaseModel):
     model_config = ConfigDict(frozen=True)
     capture: CaptureConfig = CaptureConfig()
     detection: DetectionConfig = DetectionConfig()
+    tracking: TrackingConfig = TrackingConfig()
+    classification: ClassificationConfig = ClassificationConfig()
     aim: AimConfig = AimConfig()
