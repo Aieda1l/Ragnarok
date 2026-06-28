@@ -13,7 +13,8 @@ class WorkerLoop:
     def __init__(self, capturer, detector, profiler: StageProfiler,
                  publisher: SnapshotPublisher, *, preview_max: int = 320,
                  tracker: Tracker | None = None,
-                 classifier: FriendFoeClassifier | None = None) -> None:
+                 classifier: FriendFoeClassifier | None = None,
+                 aim_controller=None) -> None:
         self._cap = capturer
         self._det = detector
         self._profiler = profiler
@@ -21,6 +22,7 @@ class WorkerLoop:
         self._preview_max = preview_max
         self._tracker = tracker or IdentityTracker()         # defaults keep Phase 1 tests passing
         self._classifier = classifier or NullClassifier()
+        self._aim = aim_controller          # optional; None keeps Phase 1/2 behavior
         self._seq = 0
         self._last_ns: int | None = None
 
@@ -44,17 +46,22 @@ class WorkerLoop:
         tracks = self._classifier.classify(tracks, frame.image)
         t_cls = now_ns()
 
+        if self._aim is not None:
+            self._aim.update(tracks, frame.t_capture_ns)
+        t_aim = now_ns()
+
         self._profiler.record("capture", t_cap - t0)
         self._profiler.record("infer", t_inf - t_cap)
         self._profiler.record("track", t_trk - t_inf)
         self._profiler.record("classify", t_cls - t_trk)
-        self._profiler.record("loop", t_cls - t0)
+        self._profiler.record("aim", t_aim - t_cls)
+        self._profiler.record("loop", t_aim - t0)
 
         fps = 0.0
         if self._last_ns is not None:
-            dt = t_cls - self._last_ns
+            dt = t_aim - self._last_ns
             fps = 1e9 / dt if dt > 0 else 0.0
-        self._last_ns = t_cls
+        self._last_ns = t_aim
 
         p50, p99 = self._profiler.percentiles("loop")
         self._seq += 1
