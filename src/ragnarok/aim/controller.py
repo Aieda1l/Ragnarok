@@ -1,18 +1,20 @@
-"""AimController — ties FOV/selection → IMM lead → aimer → mouse each frame.
+"""AimController — ties FOV/selection → IMM lead → aimer → shaper → mouse,
+with feed-forward velocity, adaptive lead, recoil, and a safety-gated trigger.
 
-Runs after classify in the worker loop. All collaborators are injected so the
-controller is fully unit-testable with a NullMouseDriver + fake key provider
-(no real cursor/keys). Side effects happen only while ``is_aim_active()`` is
-true and ``cfg.enabled``. Targets are ENEMY-only (enforced by the selector).
+All collaborators are injected; the Phase 4 ones are optional (default None) so
+the Phase 3 constructor and tests keep working. Side effects (mouse move/button)
+happen only while is_aim_active()/cfg.enabled (aim) and trigger_active() (fire).
+Targets are ENEMY-only (the selector enforces this).
 
-Phase 3 = pixel space (identity ego-motion): the crosshair-relative pixel error
-maps to mouse counts by ``deg_per_px / sensitivity``. World-angular is Phase 4.
+Pixel space this phase (identity ego-motion by default). Commanded counts are
+pushed to a CommandedMotionBuffer so a FeedForwardGMC can back-project them.
 """
 from __future__ import annotations
 
 from ragnarok.core.clock import now_ns
 from ragnarok.core.types import Tracks
 from ragnarok.aim.fov import aim_point
+from ragnarok.motion.shaper import NullShaper
 
 
 class AimController:
@@ -27,6 +29,14 @@ class AimController:
         is_aim_active,
         roi_size: int,
         clock=now_ns,
+        shaper=None,
+        vel_smoother=None,
+        adaptive_lead=None,
+        recoil=None,
+        trigger=None,
+        trigger_active=None,
+        line_clear=None,
+        commanded_buffer=None,
     ) -> None:
         self._cfg = cfg
         self._sel = selector
@@ -36,9 +46,18 @@ class AimController:
         self._active = is_aim_active
         self._cx = roi_size / 2.0
         self._cy = roi_size / 2.0
-        # degrees subtended per screen pixel (identity ego-motion this phase)
         self._deg_per_px = cfg.hfov_deg / float(cfg.screen_width_px)
         self._clock = clock
+        self._shaper = shaper if shaper is not None else NullShaper()
+        self._vel = vel_smoother
+        self._lead = adaptive_lead
+        self._recoil = recoil
+        self._trigger = trigger
+        self._trigger_active = trigger_active if trigger_active is not None else (lambda: False)
+        self._line_clear = line_clear if line_clear is not None else (lambda: True)
+        self._cmd_buf = commanded_buffer
+        self._kff = float(getattr(cfg, "kff", 0.0))
+        self._adaptive = bool(getattr(cfg, "adaptive_lead", False))
         self._last_ns: int | None = None
         self._cur_target: int | None = None
         self.target_id: int | None = None
@@ -53,13 +72,13 @@ class AimController:
         tid = self._sel.select(tracks, self._cx, self._cy)
         self.target_id = tid
         if tid is None:
-            self._aimer.reset()
+            self._reset_stateful()
             self._cur_target = None
             self._last_ns = t_capture_ns
             return
 
-        if tid != self._cur_target:        # target switch → re-latch flick / clear EMA
-            self._aimer.reset()
+        if tid != self._cur_target:
+            self._reset_stateful()
             self._cur_target = tid
 
         track = next((t for t in tracks if t.track_id == tid), None)
@@ -69,10 +88,45 @@ class AimController:
         ax, ay = aim_point(track, self._cfg.head_frac, self._cfg.aim_point)
         dt = self._dt(t_capture_ns)
         self._imm.update(tid, ax, ay, dt)
-        lead_pt = self._imm.lead(tid, self._cfg.lead_ms / 1000.0)
-        dpx, dpy = self._aimer.step((self._cx, self._cy), lead_pt, dt)
+
+        # predictive lead
+        if self._lead is not None and self._adaptive:
+            t_lead = self._lead.lead_seconds(t_capture_ns, self._clock())
+        else:
+            t_lead = self._cfg.lead_ms / 1000.0
+        lead_pt = self._imm.lead(tid, t_lead)
+
+        # feed-forward velocity (smoothed + clamped) — only if used
+        tvx, tvy = 0.0, 0.0
+        if self._kff > 0.0:
+            vx, vy = self._imm.velocity(tid)
+            if self._vel is not None:
+                vx, vy = self._vel.smooth_clamp(vx, vy)
+            tvx, tvy = vx, vy
+
+        dpx, dpy = self._aimer.step((self._cx, self._cy), lead_pt, dt, target_vel=(tvx, tvy))
+        sx, sy = self._shaper.shape(dpx, dpy)
+
+        # trigger + recoil
+        if self._trigger is not None:
+            fired = self._trigger.update(
+                track=track,
+                crosshair=(self._cx, self._cy),
+                occluded=track.time_since_update > 0,
+                enemy_confirmed=True,           # selector restricts to ENEMY
+                line_clear=self._line_clear(),
+                active=self._trigger_active(),
+            )
+            if fired and self._recoil is not None:
+                rx, ry = self._recoil.on_fire()
+                sx += rx
+                sy += ry
+
         k = self._deg_per_px / self._cfg.sensitivity   # px → mouse counts
-        self._mouse.move_relative(dpx * k, dpy * k)
+        cdx, cdy = sx * k, sy * k
+        self._mouse.move_relative(cdx, cdy)
+        if self._cmd_buf is not None:
+            self._cmd_buf.push(self._clock(), cdx, cdy)
 
     def _dt(self, t_ns: int) -> float:
         if self._last_ns is None:
@@ -82,8 +136,18 @@ class AimController:
         self._last_ns = t_ns
         return max(1e-3, min(0.1, dt))
 
-    def _disengage(self) -> None:
+    def _reset_stateful(self) -> None:
         self._aimer.reset()
+        self._shaper.reset()
+        if self._vel is not None:
+            self._vel.reset()
+        if self._trigger is not None:
+            self._trigger.release()
+        if self._recoil is not None:
+            self._recoil.release()
+
+    def _disengage(self) -> None:
+        self._reset_stateful()
         self._sel.reset()
         self._last_ns = None
         self._cur_target = None
