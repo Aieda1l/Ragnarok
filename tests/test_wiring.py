@@ -37,3 +37,35 @@ def test_build_classifier_resolves_profile():
     cfg = AppConfig(classification={"palette": "wong", "enemy_color": "sky_blue"})
     clf = build_classifier(cfg)
     assert clf._profile.name == "sky_blue"
+
+
+# ---------------------------------------------------------------------------
+# Phase 4 builder tests
+# ---------------------------------------------------------------------------
+from ragnarok.wiring import build_aimer, build_shaper, build_recoil
+from ragnarok.aim.aimers import FlickAimer, FeedbackAimer, HybridAimer, PredictiveAimer
+from ragnarok.motion.shaper import NullShaper, WindMouseShaper
+
+
+def test_build_aimer_variants():
+    assert isinstance(build_aimer(AppConfig(aim={"aimer": "flick"})), FlickAimer)
+    assert isinstance(build_aimer(AppConfig(aim={"aimer": "feedback"})), FeedbackAimer)
+    assert isinstance(build_aimer(AppConfig(aim={"aimer": "hybrid"})), HybridAimer)
+    assert isinstance(build_aimer(AppConfig(aim={"aimer": "predictive"})), PredictiveAimer)
+
+
+def test_build_shaper_variants():
+    assert isinstance(build_shaper(AppConfig()), NullShaper)              # default "none"
+    assert isinstance(build_shaper(AppConfig(motion={"shaper": "windmouse"})), WindMouseShaper)
+
+
+def test_build_recoil_disabled_is_none():
+    assert build_recoil(AppConfig()) is None                              # disabled by default
+
+
+def test_build_recoil_enabled():
+    cfg = AppConfig(recoil={"enabled": True, "pattern": ((0.0, 0.0), (0.0, 10.0))})
+    rc = build_recoil(cfg)
+    assert rc is not None
+    rc.on_fire()
+    assert rc.on_fire() == (0.0, -10.0)
