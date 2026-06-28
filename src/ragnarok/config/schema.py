@@ -29,7 +29,7 @@ class AimConfig(BaseModel):
     retain_fov_deg: float = Field(default=8.0, gt=0.0, le=179.0)   # keep (outer) > inner
     dwell_ms: float = Field(default=100.0, ge=0.0, le=2000.0)
     switch_margin: float = Field(default=0.20, ge=0.0, lt=1.0)
-    aimer: Literal["flick", "feedback"] = "feedback"
+    aimer: Literal["flick", "feedback", "hybrid", "predictive"] = "feedback"
     kp: float = Field(default=0.35, gt=0.0, le=2.0)
     max_step_px: float = Field(default=60.0, gt=0.0)
     flick_speed_px_s: float = Field(default=4000.0, gt=0.0)
@@ -38,6 +38,13 @@ class AimConfig(BaseModel):
     head_frac: float = Field(default=0.15, ge=0.0, le=1.0)
     sensitivity: float = Field(default=0.022, gt=0.0)              # deg per mouse count
     lead_ms: float = Field(default=40.0, ge=0.0, le=500.0)
+    # --- Phase 4 additions ---
+    kff: float = Field(default=0.0, ge=0.0, le=4.0)               # feed-forward velocity gain
+    vel_clamp_px_s: float = Field(default=4000.0, gt=0.0)         # v̂ saturation
+    vel_smooth_alpha: float = Field(default=0.5, gt=0.0, le=1.0)  # v̂ low-pass
+    hybrid_flick_dist_px: float = Field(default=20.0, gt=0.0)     # HybridAimer threshold
+    adaptive_lead: bool = True                                    # §6.5 adaptive vs fixed lead_ms
+    lead_alpha: float = Field(default=0.1, gt=0.0, le=1.0)        # adaptive-lead EWMA
 
 
 class TrackingConfig(BaseModel):
@@ -62,6 +69,31 @@ class ClassificationConfig(BaseModel):
     vote_min: int = Field(default=3, ge=1, le=120)
 
 
+class MotionConfig(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    shaper: Literal["none", "windmouse"] = "none"
+    gravity: float = Field(default=9.0, ge=0.0)
+    wind: float = Field(default=3.0, ge=0.0)
+    max_step: float = Field(default=15.0, gt=0.0)
+    target_area: float = Field(default=10.0, gt=0.0)
+
+
+class RecoilConfig(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    enabled: bool = False
+    scale: float = Field(default=1.0, ge=0.0)
+    pattern: tuple[tuple[float, float], ...] = ()
+
+
+class TriggerConfig(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    enabled: bool = False
+    trigger_key: str = "VK_LBUTTON"
+    activation_delay_ms: float = Field(default=80.0, ge=0.0, le=2000.0)
+    require_line_clear: bool = True
+    button: Literal["left", "right", "middle"] = "left"
+
+
 class AppConfig(BaseModel):
     model_config = ConfigDict(frozen=True)
     capture: CaptureConfig = CaptureConfig()
@@ -69,3 +101,6 @@ class AppConfig(BaseModel):
     tracking: TrackingConfig = TrackingConfig()
     classification: ClassificationConfig = ClassificationConfig()
     aim: AimConfig = AimConfig()
+    motion: MotionConfig = MotionConfig()
+    recoil: RecoilConfig = RecoilConfig()
+    trigger: TriggerConfig = TriggerConfig()
