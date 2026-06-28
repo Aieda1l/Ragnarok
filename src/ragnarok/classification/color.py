@@ -56,6 +56,33 @@ WONG_PROFILES: dict[str, ColorProfile] = {
 }
 
 
+# Selectable palettes: the vivid in-game defaults and the colorblind-safe set.
+PALETTES: dict[str, dict[str, ColorProfile]] = {
+    "default": DEFAULT_ENEMY_PROFILES,
+    "wong": WONG_PROFILES,
+}
+
+
+def resolve_enemy_profile(palette: str, color: str) -> ColorProfile:
+    """Look up a ColorProfile by palette + color name.
+
+    Raises ValueError (listing valid choices) on an unknown palette or color, so
+    a config typo fails fast at startup rather than silently never matching."""
+    try:
+        table = PALETTES[palette]
+    except KeyError:
+        raise ValueError(
+            f"unknown palette {palette!r}; choose from {sorted(PALETTES)}"
+        ) from None
+    try:
+        return table[color]
+    except KeyError:
+        raise ValueError(
+            f"unknown enemy_color {color!r} for palette {palette!r}; "
+            f"choose from {sorted(table)}"
+        ) from None
+
+
 def ring_mask(shape_hw: tuple[int, int], xyxy, thickness: int = 4) -> np.ndarray:
     """Boolean annulus straddling the bbox border (where the outline glow sits).
 
