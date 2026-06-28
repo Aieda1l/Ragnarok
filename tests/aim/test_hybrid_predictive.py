@@ -32,3 +32,20 @@ def test_hybrid_never_overshoots_close():
                     flick_speed_px_s=4000.0, ema_alpha=1.0)
     dx, dy = a.step((0.0, 0.0), (10.0, 0.0), 0.01)
     assert 0 < dx <= 10.0 + 1e-9
+
+
+def test_hybrid_far_regime_never_overshoots_high_kp():
+    # kp>1 in the far regime must still not overshoot the remaining distance.
+    import math
+    a = HybridAimer(kp=2.0, max_step_px=1000.0, flick_dist_px=20.0,
+                    flick_speed_px_s=4000.0, ema_alpha=1.0)
+    dx, dy = a.step((0.0, 0.0), (25.0, 0.0), 0.01)   # error 25 > flick_dist 20 -> far branch
+    assert 0 < dx <= 25.0 + 1e-9 and abs(dy) < 1e-6
+
+
+def test_hybrid_far_regime_max_step_clamp():
+    import math
+    a = HybridAimer(kp=1.0, max_step_px=5.0, flick_dist_px=20.0,
+                    flick_speed_px_s=4000.0, ema_alpha=1.0)
+    dx, dy = a.step((0.0, 0.0), (200.0, 0.0), 0.01)  # error 200, kp=1 -> 200 clamped to max_step 5
+    assert abs(math.hypot(dx, dy) - 5.0) < 1e-6
