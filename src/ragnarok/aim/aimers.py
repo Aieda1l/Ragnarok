@@ -35,6 +35,7 @@ class Aimer(ABC):
         crosshair: tuple[float, float],
         target_point: tuple[float, float],
         dt: float,
+        target_vel: tuple[float, float] = (0.0, 0.0),
     ) -> tuple[float, float]:
         """Return (dx, dy) pixel delta to apply this frame.
 
@@ -42,6 +43,8 @@ class Aimer(ABC):
             crosshair:    Current crosshair position in ROI pixel space.
             target_point: Desired aim point in ROI pixel space.
             dt:           Frame duration in seconds (clamped by caller).
+            target_vel:   IMM velocity estimate (px/s) for feed-forward aimers;
+                          aimers that don't use it must accept and ignore it.
 
         Returns:
             (dx, dy) — signed pixel deltas, never causing an overshoot.
@@ -63,6 +66,7 @@ class NullAimer(Aimer):
         crosshair: tuple[float, float],
         target_point: tuple[float, float],
         dt: float,
+        target_vel: tuple[float, float] = (0.0, 0.0),
     ) -> tuple[float, float]:
         return (0.0, 0.0)
 
@@ -94,6 +98,7 @@ class FlickAimer(Aimer):
         crosshair: tuple[float, float],
         target_point: tuple[float, float],
         dt: float,
+        target_vel: tuple[float, float] = (0.0, 0.0),
     ) -> tuple[float, float]:
         # Latch target_point on first call after reset (or construction).
         if self._latched is None:
