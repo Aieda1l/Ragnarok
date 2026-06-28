@@ -16,6 +16,7 @@ dependencies = [
     "supervision>=0.20",
     "opencv-python>=4.9",
     "scipy>=1.10",
+    "filterpy>=1.4.5",
     # rfdetr + torch are installed separately per environment (CUDA build); see README.
 ]
 
