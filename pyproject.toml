@@ -15,6 +15,7 @@ dependencies = [
     "mss>=9.0",
     "supervision>=0.20",
     "opencv-python>=4.9",
+    "scipy>=1.10",
     # rfdetr + torch are installed separately per environment (CUDA build); see README.
 ]
 
