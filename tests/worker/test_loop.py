@@ -55,3 +55,21 @@ def test_profiler_has_track_and_classify_stages():
     prof = StageProfiler()
     WorkerLoop(_Cap(), _Det(), prof, pub).tick()
     assert "track" in prof.stages() and "classify" in prof.stages()
+
+def test_aim_controller_update_called_with_tracks():
+    class _Aim:
+        def __init__(self): self.calls = []
+        def update(self, tracks, t_ns): self.calls.append((tuple(tracks), t_ns))
+    aim = _Aim()
+    pub = SnapshotPublisher()
+    WorkerLoop(_Cap(), _Det(), StageProfiler(), pub, aim_controller=aim).tick()
+    assert len(aim.calls) == 1
+    tracks_seen, t_ns = aim.calls[0]
+    assert len(tracks_seen) >= 1 and t_ns == 1   # frame.t_capture_ns from _Cap fake
+
+def test_aim_stage_recorded_when_controller_present():
+    class _Aim:
+        def update(self, tracks, t_ns): pass
+    prof = StageProfiler()
+    WorkerLoop(_Cap(), _Det(), prof, SnapshotPublisher(), aim_controller=_Aim()).tick()
+    assert "aim" in prof.stages()
