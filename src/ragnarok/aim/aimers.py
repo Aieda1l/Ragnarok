@@ -252,8 +252,9 @@ class HybridAimer(Aimer):
         dx = self._kp * self._fx
         dy = self._kp * self._fy
         mag = math.hypot(dx, dy)
-        if mag > self._max and mag > 0.0:
-            s = self._max / mag
+        limit = min(self._max, d)          # never exceed remaining distance OR max step
+        if mag > limit and mag > 0.0:
+            s = limit / mag
             dx *= s
             dy *= s
         return (dx, dy)
