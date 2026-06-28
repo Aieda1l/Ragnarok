@@ -42,3 +42,42 @@ def build_classifier(cfg: AppConfig) -> FriendFoeClassifier:
         vote_window=c.vote_window,
         vote_min=c.vote_min,
     )
+
+
+def build_aimer(cfg: AppConfig):
+    a = cfg.aim
+    from ragnarok.aim.aimers import (
+        FlickAimer, FeedbackAimer, HybridAimer, PredictiveAimer,
+    )
+    if a.aimer == "flick":
+        return FlickAimer(flick_speed_px_s=a.flick_speed_px_s)
+    if a.aimer == "hybrid":
+        return HybridAimer(
+            kp=a.kp, max_step_px=a.max_step_px,
+            flick_dist_px=a.hybrid_flick_dist_px,
+            flick_speed_px_s=a.flick_speed_px_s, ema_alpha=a.ema_alpha,
+        )
+    if a.aimer == "predictive":
+        return PredictiveAimer(max_step_px=a.max_step_px, kff=a.kff)
+    return FeedbackAimer(
+        kp=a.kp, max_step_px=a.max_step_px, ema_alpha=a.ema_alpha, kff=a.kff,
+    )
+
+
+def build_shaper(cfg: AppConfig):
+    m = cfg.motion
+    from ragnarok.motion.shaper import NullShaper, WindMouseShaper
+    if m.shaper == "windmouse":
+        return WindMouseShaper(
+            gravity=m.gravity, wind=m.wind,
+            max_step=m.max_step, target_area=m.target_area,
+        )
+    return NullShaper()
+
+
+def build_recoil(cfg: AppConfig):
+    r = cfg.recoil
+    if not r.enabled or not r.pattern:
+        return None
+    from ragnarok.recoil.compensator import RecoilPattern, RecoilCompensator
+    return RecoilCompensator(RecoilPattern(points=r.pattern), scale=r.scale)
