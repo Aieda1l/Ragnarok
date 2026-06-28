@@ -258,3 +258,39 @@ class HybridAimer(Aimer):
             dx *= s
             dy *= s
         return (dx, dy)
+
+
+# ---------------------------------------------------------------------------
+# PredictiveAimer
+# ---------------------------------------------------------------------------
+
+class PredictiveAimer(Aimer):
+    """Crisp predicted-point aimer with velocity feed-forward.
+
+    The controller feeds the IMM lead point as target_point and v̂ as
+    target_vel. This aimer commands the full positional error to that predicted
+    point (no smoothing) plus kff * v̂ * dt, magnitude-clamped to max_step_px.
+    Best for fast, confidently-tracked targets where prediction beats damping.
+    """
+
+    def __init__(self, *, max_step_px: float, kff: float = 1.0) -> None:
+        self._max = max_step_px
+        self._kff = kff
+
+    def step(
+        self,
+        crosshair: tuple[float, float],
+        target_point: tuple[float, float],
+        dt: float,
+        target_vel: tuple[float, float] = (0.0, 0.0),
+    ) -> tuple[float, float]:
+        ex = target_point[0] - crosshair[0]
+        ey = target_point[1] - crosshair[1]
+        dx = ex + self._kff * target_vel[0] * dt
+        dy = ey + self._kff * target_vel[1] * dt
+        mag = math.hypot(dx, dy)
+        if mag > self._max and mag > 0.0:
+            s = self._max / mag
+            dx *= s
+            dy *= s
+        return (dx, dy)

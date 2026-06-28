@@ -1,4 +1,6 @@
-from ragnarok.aim.aimers import NullAimer, FlickAimer, FeedbackAimer, HybridAimer
+import math
+
+from ragnarok.aim.aimers import NullAimer, FlickAimer, FeedbackAimer, HybridAimer, PredictiveAimer
 
 
 def test_all_aimers_accept_target_vel_kwarg():
@@ -49,3 +51,22 @@ def test_hybrid_far_regime_max_step_clamp():
                     flick_speed_px_s=4000.0, ema_alpha=1.0)
     dx, dy = a.step((0.0, 0.0), (200.0, 0.0), 0.01)  # error 200, kp=1 -> 200 clamped to max_step 5
     assert abs(math.hypot(dx, dy) - 5.0) < 1e-6
+
+
+def test_predictive_snaps_full_error_when_no_velocity():
+    a = PredictiveAimer(max_step_px=1000.0, kff=1.0)
+    dx, dy = a.step((0.0, 0.0), (30.0, 0.0), 0.01, target_vel=(0.0, 0.0))
+    assert abs(dx - 30.0) < 1e-6 and abs(dy) < 1e-6
+
+
+def test_predictive_adds_velocity_feedforward():
+    a = PredictiveAimer(max_step_px=1000.0, kff=1.0)
+    # zero positional error, but target moving right at 500 px/s over dt=0.01 -> +5 px FF
+    dx, dy = a.step((0.0, 0.0), (0.0, 0.0), 0.01, target_vel=(500.0, 0.0))
+    assert abs(dx - 5.0) < 1e-6
+
+
+def test_predictive_magnitude_clamped():
+    a = PredictiveAimer(max_step_px=10.0, kff=1.0)
+    dx, dy = a.step((0.0, 0.0), (100.0, 0.0), 0.01)
+    assert abs(math.hypot(dx, dy) - 10.0) < 1e-6
