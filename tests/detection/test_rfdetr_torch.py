@@ -18,3 +18,44 @@ def test_detect_returns_detections_and_passes_threshold():
     assert len(out) == 1
     assert list(out)[0].xyxy == (10.0, 10.0, 20.0, 30.0)
     assert det._model.threshold == 0.6
+
+
+def test_optimize_fp16_calls_model_with_dtype():
+    from ragnarok.detection.rfdetr_torch import _optimize_fp16
+
+    class _Opt:
+        def __init__(self):
+            self.dtype = "unset"
+
+        def optimize_for_inference(self, dtype=None):
+            self.dtype = dtype
+
+    m = _Opt()
+    assert _optimize_fp16(m, dtype="FP16") is True  # explicit dtype avoids importing torch
+    assert m.dtype == "FP16"
+
+
+def test_optimize_fp16_is_best_effort_on_failure(recwarn):
+    from ragnarok.detection.rfdetr_torch import _optimize_fp16
+
+    class _Bad:
+        def optimize_for_inference(self, dtype=None):
+            raise RuntimeError("unsupported on this build")
+
+    assert _optimize_fp16(_Bad(), dtype="FP16") is False  # never raises
+    assert any("optimize_for_inference" in str(w.message) for w in recwarn.list)
+
+
+def test_injected_model_is_never_optimized():
+    # A model passed in by a caller/test is theirs to manage — the detector must
+    # not call optimize_for_inference on it (only on auto-built models).
+    class _Tracked:
+        def __init__(self):
+            self.optimized = False
+
+        def optimize_for_inference(self, dtype=None):
+            self.optimized = True
+
+    m = _Tracked()
+    RFDETRTorchDetector(DetectionConfig(optimize_fp16=True), model=m)
+    assert m.optimized is False
