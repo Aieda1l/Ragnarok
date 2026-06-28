@@ -75,16 +75,18 @@ class FeedForwardGMC(EgoMotion):
     ) -> None:
         self._f = focal_length_px(hfov_deg, screen_width_px)
         self._deg_per_count = deg_per_count
-        self._tau = tau_render_s
-        self._frame_dt = frame_dt_s
+        # Pre-convert to integer ns so the per-frame window math stays pure int
+        # (float64 loses ns precision once perf_counter_ns exceeds 2**53).
+        self._tau_ns = round(tau_render_s * 1e9)
+        self._frame_dt_ns = round(frame_dt_s * 1e9)
         self.buffer = buffer if buffer is not None else CommandedMotionBuffer()
 
     def estimate(self, frame) -> np.ndarray:
         t_cap = getattr(frame, "t_capture_ns", None)
         if t_cap is None:
             return np.eye(2, 3, dtype=np.float32)
-        hi = int(t_cap - self._tau * 1e9)
-        lo = int(hi - self._frame_dt * 1e9)
+        hi = t_cap - self._tau_ns
+        lo = hi - self._frame_dt_ns
         dcx, dcy = self.buffer.integrate(lo, hi)
         yaw = math.radians(dcx * self._deg_per_count)
         pitch = math.radians(dcy * self._deg_per_count)
