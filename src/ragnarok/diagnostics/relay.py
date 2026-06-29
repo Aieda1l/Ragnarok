@@ -32,6 +32,9 @@ def limit_cycle(t, y) -> tuple[float, float]:
 
 
 def ku_from_relay(d: float, a: float) -> float:
+    # Describing-function ultimate gain for an ideal (zero-hysteresis) relay.
+    # With relay hysteresis eps > 0 the correct form is 4d/(pi*sqrt(a**2 - eps**2));
+    # callers using hysteresis must account for it (run_relay_tune defaults eps=0).
     return 4.0 * d / (math.pi * a)
 
 

@@ -8,6 +8,7 @@ This lets the controller/auto-tuners be characterized entirely off-box.
 from __future__ import annotations
 
 from collections import deque
+from collections.abc import Callable
 
 import numpy as np
 
@@ -46,8 +47,13 @@ class AimPlant:
         return self._pos
 
 
-def simulate_closed_loop(controller_step, plant: AimPlant, *, setpoint: float,
-                         n_steps: int, dt_s: float, y0: float = 0.0):
+def simulate_closed_loop(
+    controller_step: Callable[[float, float], float], plant: AimPlant, *,
+    setpoint: float, n_steps: int, dt_s: float, y0: float = 0.0,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    # y0 is an additive reporting offset: the plant always resets to internal 0,
+    # so measured = y0 + plant.step(...). The controller still sees the offset via
+    # error = setpoint - measured, so the closed loop stays internally consistent.
     plant.reset()
     measured = y0
     t_s = np.empty(n_steps)
