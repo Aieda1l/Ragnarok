@@ -52,6 +52,26 @@ def test_ap_gts_no_preds_is_zero():
     assert average_precision_at_iou([], [(0.0, 0.0, 10.0, 10.0)], iou_thresh=0.75) == 0.0
 
 
+def test_map_per_image_rejects_cross_image_match():
+    from ragnarok.training.metrics import mean_average_precision
+    # image A: a false positive only; image B: an unpredicted gt at A's FP coords.
+    # Pooling would let A's FP match B's gt (AP 0.5); per-image matching -> 0.0.
+    per_image = [
+        ([((0.0, 0.0, 10.0, 10.0), 0.9)], [(100.0, 100.0, 110.0, 110.0)]),
+        ([], [(0.0, 0.0, 10.0, 10.0)]),
+    ]
+    assert mean_average_precision(per_image, iou_thresh=0.75) == 0.0
+
+
+def test_mean_center_error_pools_per_image_distances():
+    from ragnarok.training.metrics import mean_center_error
+    per_image = [
+        ([(0.0, 2.0, 10.0, 12.0)], [(0.0, 0.0, 10.0, 10.0)]),   # c(5,7) vs c(5,5), IoU .667 -> dist 2
+        ([(0.0, 4.0, 10.0, 16.0)], [(0.0, 0.0, 10.0, 12.0)]),   # c(5,10) vs c(5,6), IoU .5  -> dist 4
+    ]
+    assert abs(mean_center_error(per_image) - 3.0) < 1e-9       # mean of 2 and 4
+
+
 def test_center_error_matched_distance():
     gts = [(0.0, 0.0, 10.0, 10.0)]                 # center (5,5)
     preds = [(0.0, 2.0, 10.0, 12.0)]               # center (5,7), IoU 0.667 >= 0.5 -> matches; dist 2

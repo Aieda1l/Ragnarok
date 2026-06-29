@@ -11,7 +11,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from ragnarok.core.clock import now_ns
-from ragnarok.training.metrics import average_precision_at_iou, center_error
+from ragnarok.training.metrics import mean_average_precision, mean_center_error
 
 
 @dataclass(frozen=True)
@@ -24,18 +24,20 @@ class BenchmarkResult:
 
 
 def run_benchmark(detector, dataset, *, clock=now_ns, iou_thresh: float = 0.75) -> BenchmarkResult:
-    all_preds: list[tuple[tuple, float]] = []
-    all_gts: list[tuple] = []
+    # Keep predictions/gts grouped BY IMAGE so matching never crosses frames
+    # (a false positive in one frame must not match a gt in another).
+    per_image: list[tuple[list, list]] = []
     latencies_ns: list[int] = []
     for frame, gt_boxes in dataset:
         t0 = clock()
         dets = detector.detect(frame)
         t1 = clock()
         latencies_ns.append(int(t1 - t0))
-        all_preds.extend((d.xyxy, d.confidence) for d in dets)
-        all_gts.extend(tuple(b) for b in gt_boxes)
-    map75 = average_precision_at_iou(all_preds, all_gts, iou_thresh=iou_thresh)
-    cerr = center_error(all_preds, all_gts)
+        preds = [(d.xyxy, d.confidence) for d in dets]
+        gts = [tuple(b) for b in gt_boxes]
+        per_image.append((preds, gts))
+    map75 = mean_average_precision(per_image, iou_thresh=iou_thresh)
+    cerr = mean_center_error(per_image)
     if latencies_ns:
         arr = np.asarray(latencies_ns, dtype=np.int64)
         p50, p99 = (float(v) / 1e6 for v in np.percentile(arr, [50, 99]))
