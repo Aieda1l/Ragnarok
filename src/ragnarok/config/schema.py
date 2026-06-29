@@ -117,6 +117,27 @@ class DiagnosticsConfig(BaseModel):
     reg_max_overshoot_pct: float = Field(default=5.0, ge=0.0)
 
 
+class TrainingConfig(BaseModel):
+    """Training-pipeline config (spec §12).
+
+    NOTE: the Roboflow API key is intentionally NOT a field here — it is read
+    from the RAGNAROK_ROBOFLOW_API_KEY environment variable by the Roboflow
+    client (Plan 6B), so secrets never land in a committed/example config.
+    Paths are relative to the Ragnarok app data dir.
+    """
+    model_config = ConfigDict(frozen=True)
+    frames_dir: str = "captures"
+    dataset_dir: str = "datasets"
+    engines_dir: str = "engines"
+    roboflow_workspace: str = ""
+    roboflow_project: str = ""
+    roboflow_version: int = Field(default=1, ge=1)
+    capture_conf_threshold: float = Field(default=0.5, ge=0.0, le=1.0)
+    scene_change_threshold: float = Field(default=0.15, ge=0.0, le=1.0)
+    min_capture_interval_s: float = Field(default=0.5, ge=0.0)
+    hard_example_conf_threshold: float = Field(default=0.5, ge=0.0, le=1.0)
+
+
 class AppConfig(BaseModel):
     model_config = ConfigDict(frozen=True)
     capture: CaptureConfig = CaptureConfig()
@@ -128,3 +149,4 @@ class AppConfig(BaseModel):
     recoil: RecoilConfig = RecoilConfig()
     trigger: TriggerConfig = TriggerConfig()
     diagnostics: DiagnosticsConfig = DiagnosticsConfig()
+    training: TrainingConfig = TrainingConfig()
