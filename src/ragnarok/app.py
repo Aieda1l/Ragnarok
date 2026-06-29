@@ -72,6 +72,17 @@ def main() -> int:
     app = QApplication(sys.argv)
     cfg = load_config(_config_path())
     publisher = SnapshotPublisher()
+    if cfg.tracking.gmc == "feedforward":
+        reasons = []
+        if not cfg.aim.enabled:
+            reasons.append("aim is disabled (no commanded-motion producer)")
+        if cfg.tracking.deg_per_count == 0.0:
+            reasons.append("deg_per_count is 0 (uncalibrated)")
+        if cfg.tracking.backend != "botsort":
+            reasons.append(f"tracking backend is {cfg.tracking.backend!r}, not 'botsort'")
+        if reasons:
+            import warnings
+            warnings.warn("GMC 'feedforward' is enabled but inert: " + "; ".join(reasons))
     from ragnarok.tracking.egomotion import CommandedMotionBuffer
     cmd_buffer = CommandedMotionBuffer()
     aim_controller = _build_aim_controller(cfg, cmd_buffer) if cfg.aim.enabled else None
