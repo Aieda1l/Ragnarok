@@ -45,3 +45,23 @@ def test_reset_clears_integral():
     a.reset()
     dx, _ = a.step((0.0, 0.0), (10.0, 0.0), 0.1)   # integral restarts at error*dt
     assert abs(dx - 2.0) < 1e-9
+
+
+def test_freeze_on_saturation_prevents_windup():
+    # ki=1, kp=0, max_step=1, error=10 held: the magnitude clamp saturates every
+    # frame, so anti-windup #3 must back out each integral increment -> _ix stays
+    # bounded near 1 instead of growing to ~100.
+    a = FeedbackAimer(kp=0.0, ki=1.0, max_step_px=1.0, ema_alpha=1.0)
+    for _ in range(100):
+        a.step((0.0, 0.0), (10.0, 0.0), 0.1)
+    assert a._ix < 5.0     # without freeze-on-saturation this would reach ~100
+
+
+def test_derivative_is_on_filtered_error_not_raw():
+    # ema_alpha=0.5 so filtered error lags raw. kd=1, dt=1, kp=0, large max_step.
+    # Step 2 error jumps 0->100: filtered error = 0 + 0.5*(100-0) = 50, so the
+    # derivative term is (50-0)/1 = 50, NOT the raw 100 (which would be a kick).
+    a = FeedbackAimer(kp=0.0, kd=1.0, ema_alpha=0.5, max_step_px=1e9)
+    a.step((0.0, 0.0), (0.0, 0.0), 1.0)              # seed at error 0
+    dx, _ = a.step((0.0, 0.0), (100.0, 0.0), 1.0)    # error jumps to 100
+    assert abs(dx - 50.0) < 1e-6                      # filtered (50), not raw (100)
