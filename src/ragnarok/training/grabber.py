@@ -31,7 +31,9 @@ class FrameGrabber:
                               scene_change_threshold=self._scene):
             return False
         self._writer(frame.image, frame.t_capture_ns)
-        self._last_saved_image = frame.image
+        # copy: frame.image may alias a reused capture ring-buffer the capture
+        # thread overwrites; the retained last-saved image must be stable.
+        self._last_saved_image = frame.image.copy()
         self._last_save_ns = now
         self.count += 1
         return True

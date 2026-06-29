@@ -43,7 +43,8 @@ def test_aggregates_across_images():
     g1 = [(0.0, 0.0, 10.0, 10.0)]
     g2 = [(20.0, 20.0, 30.0, 30.0)]
     dataset = [(_frame(), g1), (_frame(), g2)]
-    # detector returns g1 for both images -> image 2 is a miss
+    # detector returns g1 for both images: image 1 is a TP, image 2 is a FP whose
+    # box must NOT cross-match g2. Per-image matching -> 1 TP, 1 miss over 2 gt -> 0.5.
     res = run_benchmark(_PerfectDetector(g1), dataset, clock=_StepClock(1_000_000))
     assert res.n_images == 2
-    assert 0.0 <= res.map75 <= 1.0
+    assert abs(res.map75 - 0.5) < 1e-9
