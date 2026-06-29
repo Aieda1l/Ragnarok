@@ -63,3 +63,21 @@ def test_track_xyxy_close_to_detection():
         out = tr.update(_dets(box))
     t = out.items[0]
     assert np.allclose(t.xyxy, box, atol=5.0)
+
+
+def test_update_forwards_frame_to_ego():
+    from ragnarok.tracking.egomotion import EgoMotion
+
+    class _SpyEgo(EgoMotion):
+        def __init__(self):
+            self.seen = "unset"
+        def estimate(self, frame):
+            self.seen = frame                     # capture what the core passed
+            return np.eye(2, 3, dtype=np.float32)
+
+    spy = _SpyEgo()
+    tr = BotSortTracker(ego=spy)
+    sentinel = object()
+    tr.update(_dets((10, 10, 30, 50)), sentinel)  # 2nd positional arg is `frame`
+    assert tr.ego is spy
+    assert spy.seen is sentinel                    # the exact frame reached the ego

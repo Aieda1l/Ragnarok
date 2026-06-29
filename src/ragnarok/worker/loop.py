@@ -5,7 +5,7 @@ import numpy as np
 from ragnarok.core.clock import now_ns
 from ragnarok.latency.profiler import StageProfiler
 from ragnarok.telemetry.snapshot import TelemetrySnapshot, SnapshotPublisher
-from ragnarok.tracking.base import Tracker, IdentityTracker, IDENTITY_AFFINE
+from ragnarok.tracking.base import Tracker, IdentityTracker
 from ragnarok.classification.base import FriendFoeClassifier, NullClassifier
 from ragnarok.gui.overlay import draw_overlay
 
@@ -41,7 +41,7 @@ class WorkerLoop:
             return
         dets = self._det.detect(frame)
         t_inf = now_ns()
-        tracks = self._tracker.update(dets, IDENTITY_AFFINE)   # Phase 2: identity ego-motion
+        tracks = self._tracker.update(dets, frame)   # frame carries t_capture_ns for GMC
         t_trk = now_ns()
         tracks = self._classifier.classify(tracks, frame.image)
         t_cls = now_ns()
