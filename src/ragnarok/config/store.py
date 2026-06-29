@@ -15,7 +15,7 @@ def load_config(path: Path) -> AppConfig:
 def save_config(cfg: AppConfig, path: Path) -> None:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(tomlkit.dumps(cfg.model_dump()), encoding="utf-8")
+    path.write_text(tomlkit.dumps(cfg.model_dump(exclude_none=True)), encoding="utf-8")
 
 class ConfigHandle:
     """Live config snapshot. Single-writer/single-reader: `swap` rebinds one
