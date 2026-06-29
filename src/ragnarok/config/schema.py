@@ -63,6 +63,10 @@ class TrackingConfig(BaseModel):
     track_buffer: int = Field(default=30, ge=1, le=600)
     match_thresh: float = Field(default=0.8, ge=0.0, le=1.0)
     proximity_thresh: float = Field(default=0.5, ge=0.0, le=1.0)
+    # --- Phase 5B feed-forward GMC ---
+    gmc: Literal["off", "feedforward"] = "off"
+    deg_per_count: float = 0.0          # SIGNED degrees of yaw/pitch per mouse count (empirical)
+    tau_render_s: float = Field(default=0.0, ge=0.0, le=0.1)   # render+display latency window
 
 
 class ClassificationConfig(BaseModel):
