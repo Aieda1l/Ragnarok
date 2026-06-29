@@ -11,7 +11,7 @@ import numpy as np
 from ragnarok.core.types import Detections, Team, Track, Tracks
 
 from ._vendor.botsort_core import BoTSORT
-from .base import IDENTITY_AFFINE, Tracker
+from .base import Tracker
 from .egomotion import EgoMotion, IdentityEgoMotion
 
 
