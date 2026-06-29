@@ -59,8 +59,12 @@ def build_aimer(cfg: AppConfig):
         )
     if a.aimer == "predictive":
         return PredictiveAimer(max_step_px=a.max_step_px, kff=a.kff)
+    ki = a.ki if a.controller_mode in ("pi", "pid") else 0.0
+    kd = a.kd if a.controller_mode == "pid" else 0.0
     return FeedbackAimer(
         kp=a.kp, max_step_px=a.max_step_px, ema_alpha=a.ema_alpha, kff=a.kff,
+        ki=ki, kd=kd, integral_clamp=a.integral_clamp,
+        cond_integ_thresh_px=a.cond_integ_thresh_px,
     )
 
 
