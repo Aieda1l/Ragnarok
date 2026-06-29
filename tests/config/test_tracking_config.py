@@ -68,3 +68,26 @@ class TestAppConfigNesting:
             capture={"backend": "mss", "roi_size": 384, "target_fps": 60, "monitor_index": 0},
         )
         assert app.tracking.backend == "botsort"
+
+
+def test_gmc_defaults_off():
+    assert TrackingConfig().gmc == "off"
+    assert TrackingConfig().deg_per_count == 0.0
+    assert TrackingConfig().tau_render_s == 0.0
+
+
+def test_gmc_feedforward_and_signed_deg_per_count():
+    t = TrackingConfig(gmc="feedforward", deg_per_count=-0.022, tau_render_s=0.012)
+    assert t.gmc == "feedforward"
+    assert t.deg_per_count == -0.022          # signed: negative is valid
+    assert t.tau_render_s == 0.012
+
+
+def test_gmc_rejects_unknown_mode():
+    with pytest.raises(ValidationError):
+        TrackingConfig(gmc="optical")  # type: ignore[arg-type]
+
+
+def test_tau_render_bounds():
+    with pytest.raises(ValidationError):
+        TrackingConfig(tau_render_s=-0.001)
