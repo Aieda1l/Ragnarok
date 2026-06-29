@@ -95,6 +95,18 @@ class TriggerConfig(BaseModel):
     button: Literal["left", "right", "middle"] = "left"
 
 
+class DiagnosticsConfig(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    step_px: float = Field(default=200.0, gt=0.0)
+    sample_hz: float = Field(default=1000.0, gt=0.0)
+    timeout_s: float = Field(default=1.0, gt=0.0, le=30.0)
+    settle_band_frac: float = Field(default=0.02, gt=0.0, lt=1.0)
+    rise_lo: float = Field(default=0.1, gt=0.0, lt=1.0)
+    rise_hi: float = Field(default=0.9, gt=0.0, lt=1.0)
+    dead_frac: float = Field(default=0.05, ge=0.0, lt=1.0)
+    reg_max_overshoot_pct: float = Field(default=5.0, ge=0.0)
+
+
 class AppConfig(BaseModel):
     model_config = ConfigDict(frozen=True)
     capture: CaptureConfig = CaptureConfig()
@@ -105,3 +117,4 @@ class AppConfig(BaseModel):
     motion: MotionConfig = MotionConfig()
     recoil: RecoilConfig = RecoilConfig()
     trigger: TriggerConfig = TriggerConfig()
+    diagnostics: DiagnosticsConfig = DiagnosticsConfig()
