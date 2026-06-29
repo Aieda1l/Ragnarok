@@ -20,8 +20,13 @@ class Tracker(ABC):
     """Maps detections to tracks with stable ids across frames."""
 
     @abstractmethod
-    def update(self, detections: Detections, ego_affine=IDENTITY_AFFINE) -> Tracks:
-        """Advance one frame and return the current confirmed tracks."""
+    def update(self, detections: Detections, frame=None) -> Tracks:
+        """Advance one frame and return the current confirmed tracks.
+
+        ``frame`` is the captured Frame (or None); a GMC ego provider reads its
+        ``t_capture_ns`` to build the global-motion warp. Trackers that don't do
+        ego-motion compensation ignore it.
+        """
         raise NotImplementedError
 
 
@@ -36,7 +41,7 @@ class IdentityTracker(Tracker):
     def __init__(self) -> None:
         self._next_id = 0
 
-    def update(self, detections: Detections, ego_affine=IDENTITY_AFFINE) -> Tracks:
+    def update(self, detections: Detections, frame=None) -> Tracks:
         tracks = []
         for det in detections:
             self._next_id += 1

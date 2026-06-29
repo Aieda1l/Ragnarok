@@ -33,7 +33,7 @@ class BotSortTracker(Tracker):
             frame_rate=frame_rate,
         )
 
-    def update(self, detections: Detections, ego_affine=IDENTITY_AFFINE) -> Tracks:
+    def update(self, detections: Detections, frame=None) -> Tracks:
         rows = [
             [d.xyxy[0], d.xyxy[1], d.xyxy[2], d.xyxy[3], d.confidence, d.class_id]
             for d in detections
@@ -41,9 +41,9 @@ class BotSortTracker(Tracker):
         output_results = (
             np.asarray(rows, dtype=float) if rows else np.empty((0, 6), dtype=float)
         )
-
-        # `frame` is consumed only by the ego-motion provider (identity ignores it).
-        stracks = self._core.update(output_results, frame=None)
+        # The frame is consumed only by the injected ego provider
+        # (IdentityEgoMotion ignores it; FeedForwardGMC reads frame.t_capture_ns).
+        stracks = self._core.update(output_results, frame=frame)
 
         frame_id = self._core.frame_id
         tracks = []
