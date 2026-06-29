@@ -12,12 +12,21 @@ from ragnarok.tracking.base import Tracker, IdentityTracker
 from ragnarok.classification.base import FriendFoeClassifier, NullClassifier
 
 
-def build_tracker(cfg: AppConfig) -> Tracker:
+def build_tracker(cfg: AppConfig, *, gmc_buffer=None) -> Tracker:
     t = cfg.tracking
     if t.backend == "identity":
         return IdentityTracker()
     from ragnarok.tracking.botsort import BotSortTracker
+    ego = None
+    if t.gmc == "feedforward" and gmc_buffer is not None:
+        from ragnarok.tracking.egomotion import FeedForwardGMC
+        ego = FeedForwardGMC(
+            hfov_deg=cfg.aim.hfov_deg, screen_width_px=cfg.aim.screen_width_px,
+            deg_per_count=t.deg_per_count, tau_render_s=t.tau_render_s,
+            frame_dt_s=1.0 / cfg.capture.target_fps, buffer=gmc_buffer,
+        )
     return BotSortTracker(
+        ego=ego,                                  # None -> BotSortTracker uses IdentityEgoMotion
         track_high_thresh=t.track_high_thresh,
         track_low_thresh=t.track_low_thresh,
         new_track_thresh=t.new_track_thresh,
