@@ -1,0 +1,43 @@
+"""Pure feed-forward-GMC calibration solvers (spec §5.3, §18).
+
+estimate_tau_render: the render+display latency by which the on-screen response
+trails a commanded motion, found by cross-correlating the commanded signal with
+the measured global-motion (optical-flow) signal on a common uniform grid. The
+live optical-flow capture that produces `measured` is a box-only smoke; this
+function (the analysis) is pure and unit-tested.
+"""
+from __future__ import annotations
+
+import numpy as np
+
+
+def estimate_tau_render(commanded, measured, dt_s: float, *, max_lag_s: float = 0.1) -> float:
+    if dt_s <= 0.0:
+        raise ValueError("dt_s must be positive")
+    c = np.asarray(commanded, dtype=float)
+    m = np.asarray(measured, dtype=float)
+    if c.size == 0 or m.size == 0:
+        raise ValueError("commanded and measured must be non-empty")
+    c = c - c.mean()
+    m = m - m.mean()
+    # Full cross-correlation; positive lag = measured trails commanded.
+    corr = np.correlate(m, c, mode="full")
+    lags = np.arange(-(len(c) - 1), len(m))          # sample lags aligned with corr
+    max_lag = int(round(max_lag_s / dt_s))
+    keep = (lags >= 0) & (lags <= max_lag)           # render latency is non-negative
+    if not keep.any():
+        return 0.0
+    best = lags[keep][int(np.argmax(corr[keep]))]
+    return float(best) * dt_s
+
+
+def solve_deg_per_count(total_counts: float, measured_total_deg: float) -> float:
+    """Signed degrees of world rotation per commanded mouse count (spec §18).
+
+    From a calibration turn across a static reference: command total_counts and
+    measure the total angular displacement (deg) the world rotated. Sign is
+    preserved so the GMC back-projection uses the correct direction.
+    """
+    if total_counts == 0.0:
+        raise ValueError("total_counts must be non-zero to solve deg_per_count")
+    return measured_total_deg / total_counts
