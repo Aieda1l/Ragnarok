@@ -69,3 +69,15 @@ def test_build_recoil_enabled():
     assert rc is not None
     rc.on_fire()
     assert rc.on_fire() == (0.0, -10.0)
+
+
+def test_build_aimer_feedback_mode_p_zeroes_gains():
+    a = build_aimer(AppConfig(aim={"aimer": "feedback", "controller_mode": "p",
+                                   "ki": 9.0, "kd": 9.0}))
+    assert a._ki == 0.0 and a._kd == 0.0     # mode 'p' overrides the gains
+
+
+def test_build_aimer_feedback_mode_pid_applies_gains():
+    a = build_aimer(AppConfig(aim={"aimer": "feedback", "controller_mode": "pid",
+                                   "ki": 0.2, "kd": 0.05}))
+    assert a._ki == 0.2 and a._kd == 0.05
