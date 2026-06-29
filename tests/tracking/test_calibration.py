@@ -1,7 +1,8 @@
 """Tests for the pure GMC calibration solvers."""
 from __future__ import annotations
 import numpy as np
-from ragnarok.tracking.calibration import estimate_tau_render
+from ragnarok.tracking.calibration import estimate_tau_render, solve_deg_per_count
+import pytest
 
 
 def test_recovers_known_lag():
@@ -31,3 +32,17 @@ def test_lag_capped_at_max():
     measured = np.zeros(n); measured[300:320] = 1.0   # 290 ms apart, beyond max
     lag = estimate_tau_render(commanded, measured, dt, max_lag_s=0.05)
     assert lag <= 0.05 + 1e-9
+
+
+def test_deg_per_count_basic():
+    assert abs(solve_deg_per_count(1000.0, 22.0) - 0.022) < 1e-9
+
+
+def test_deg_per_count_preserves_sign():
+    # positive commanded counts, world rotated the other way -> negative ratio
+    assert solve_deg_per_count(1000.0, -22.0) < 0.0
+
+
+def test_deg_per_count_zero_counts_raises():
+    with pytest.raises(ValueError):
+        solve_deg_per_count(0.0, 22.0)
