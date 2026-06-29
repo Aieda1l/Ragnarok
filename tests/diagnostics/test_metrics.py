@@ -44,6 +44,15 @@ def test_never_settles_returns_none():
     assert settling_time(t, y, y0=0.0, y_final=1.0, band=0.02) is None
 
 
+def test_dead_time_detects_flat_delay():
+    # Flat at y0 for the first 0.1 s, then a steep ramp to y_final. dead_time is
+    # the time to reach dead_frac (5%); the steep ramp crosses 5% right after 0.1 s.
+    t = np.arange(0.0, 1.0, 0.001)
+    y = np.clip(np.where(t < 0.1, 0.0, (t - 0.1) / 0.01), 0.0, 1.0)  # rises 0->1 over 10 ms
+    dt_dead = dead_time(t, y, y0=0.0, y_final=1.0, dead_frac=0.05)
+    assert abs(dt_dead - 0.1) < 5e-3              # ~0.1 s flat dead-time
+
+
 def test_zero_step_is_guarded():
     t = np.arange(0.0, 1.0, 0.001)
     y = np.zeros_like(t)

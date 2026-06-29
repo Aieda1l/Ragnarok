@@ -12,9 +12,10 @@ FlickAimer:
     so it never overshoots.  The latched point is NOT updated until reset().
 
 FeedbackAimer:
-    P-controller on the live (target_point - crosshair) error, EMA-smoothed,
-    magnitude-clamped to max_step_px.  Phase-4 hook: kff param present but
-    unused (feed-forward term = kff * target_vel * dt, where kff=0 in Phase 3).
+    2-DOF PID on the live (target_point - crosshair) error: Kp*ema + Ki*integral
+    + Kd*d(ema)/dt + Kff*target_vel*dt, EMA-smoothed, with three-fold anti-windup,
+    magnitude-clamped to min(max_step_px, remaining distance) (never overshoots).
+    Defaults (ki=kd=0, kff=0) reduce it to the original P-controller.
 """
 from __future__ import annotations
 

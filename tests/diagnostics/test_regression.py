@@ -33,3 +33,14 @@ def test_feedback_p_controller_is_well_behaved():
     assert res.overshoot_pct <= cfg.reg_max_overshoot_pct   # P on integrator: ~0
     assert res.settling_s is not None                       # it settles
     assert res.rise_s is not None and res.rise_s > 0.0
+
+
+def test_feedback_pid_path_holds_no_overshoot_invariant():
+    # Locks the no-overshoot invariant on the PID path (ki,kd>0), not just P:
+    # the per-step min(max_step, remaining-distance) clamp + freeze-on-saturation
+    # must keep the closed loop from passing the setpoint for any gains.
+    cfg = DiagnosticsConfig()
+    aimer = FeedbackAimer(kp=0.3, ki=0.5, kd=0.02, max_step_px=1e9, ema_alpha=1.0)
+    res = _drive(aimer, setpoint=100.0, dt=0.002, n=600)
+    assert res.overshoot_pct <= cfg.reg_max_overshoot_pct   # integral windup can't overshoot
+    assert res.settling_s is not None
