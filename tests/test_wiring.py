@@ -81,3 +81,34 @@ def test_build_aimer_feedback_mode_pid_applies_gains():
     a = build_aimer(AppConfig(aim={"aimer": "feedback", "controller_mode": "pid",
                                    "ki": 0.2, "kd": 0.05}))
     assert a._ki == 0.2 and a._kd == 0.05
+
+
+# ---------------------------------------------------------------------------
+# Phase 5B GMC buffer wiring tests
+# ---------------------------------------------------------------------------
+def test_build_tracker_no_gmc_by_default_uses_identity_ego():
+    from ragnarok.wiring import build_tracker
+    from ragnarok.tracking.egomotion import IdentityEgoMotion
+    from ragnarok.tracking.botsort import BotSortTracker
+    trk = build_tracker(AppConfig(), gmc_buffer=object())  # gmc off by default
+    assert isinstance(trk, BotSortTracker)
+    assert isinstance(trk.ego, IdentityEgoMotion)
+
+
+def test_build_tracker_feedforward_injects_shared_buffer_gmc():
+    from ragnarok.wiring import build_tracker
+    from ragnarok.tracking.egomotion import CommandedMotionBuffer, FeedForwardGMC
+    buf = CommandedMotionBuffer()
+    cfg = AppConfig(tracking={"gmc": "feedforward", "deg_per_count": 0.02})
+    trk = build_tracker(cfg, gmc_buffer=buf)
+    assert isinstance(trk.ego, FeedForwardGMC)
+    assert trk.ego.buffer is buf                    # SAME buffer object (shared)
+
+
+def test_build_tracker_feedforward_without_buffer_stays_identity():
+    # No buffer supplied -> cannot share -> fall back to identity ego (safe).
+    from ragnarok.wiring import build_tracker
+    from ragnarok.tracking.egomotion import IdentityEgoMotion
+    cfg = AppConfig(tracking={"gmc": "feedforward", "deg_per_count": 0.02})
+    trk = build_tracker(cfg, gmc_buffer=None)
+    assert isinstance(trk.ego, IdentityEgoMotion)
