@@ -160,7 +160,13 @@ class FeedbackAimer(Aimer):
         self._ix = 0.0
         self._iy = 0.0
 
-    def step(self, crosshair, target_point, dt, target_vel=(0.0, 0.0)):
+    def step(
+        self,
+        crosshair: tuple[float, float],
+        target_point: tuple[float, float],
+        dt: float,
+        target_vel: tuple[float, float] = (0.0, 0.0),
+    ) -> tuple[float, float]:
         ex = target_point[0] - crosshair[0]
         ey = target_point[1] - crosshair[1]
 
