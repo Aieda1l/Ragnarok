@@ -25,3 +25,15 @@ def estimate_tau_render(commanded, measured, dt_s: float, *, max_lag_s: float = 
         return 0.0
     best = lags[keep][int(np.argmax(corr[keep]))]
     return float(best) * dt_s
+
+
+def solve_deg_per_count(total_counts: float, measured_total_deg: float) -> float:
+    """Signed degrees of world rotation per commanded mouse count (spec §18).
+
+    From a calibration turn across a static reference: command total_counts and
+    measure the total angular displacement (deg) the world rotated. Sign is
+    preserved so the GMC back-projection uses the correct direction.
+    """
+    if total_counts == 0.0:
+        raise ValueError("total_counts must be non-zero to solve deg_per_count")
+    return measured_total_deg / total_counts
