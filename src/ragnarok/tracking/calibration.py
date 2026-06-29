@@ -12,8 +12,12 @@ import numpy as np
 
 
 def estimate_tau_render(commanded, measured, dt_s: float, *, max_lag_s: float = 0.1) -> float:
+    if dt_s <= 0.0:
+        raise ValueError("dt_s must be positive")
     c = np.asarray(commanded, dtype=float)
     m = np.asarray(measured, dtype=float)
+    if c.size == 0 or m.size == 0:
+        raise ValueError("commanded and measured must be non-empty")
     c = c - c.mean()
     m = m - m.mean()
     # Full cross-correlation; positive lag = measured trails commanded.
