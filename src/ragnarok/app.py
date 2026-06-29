@@ -78,7 +78,8 @@ def main() -> int:
     loop = WorkerLoop(
         create_capturer(cfg.capture), create_detector(cfg.detection),
         StageProfiler(), publisher,
-        tracker=build_tracker(cfg, gmc_buffer=cmd_buffer),
+        # only feed GMC the buffer when aim is enabled (the buffer's only producer)
+        tracker=build_tracker(cfg, gmc_buffer=cmd_buffer if cfg.aim.enabled else None),
         classifier=build_classifier(cfg),
         aim_controller=aim_controller,
     )
