@@ -41,7 +41,7 @@ def test_seq_increments():
 def test_tick_publishes_tracks_from_injected_tracker():
     from ragnarok.core.types import Track, Tracks
     class _Trk:
-        def update(self, detections, ego_affine=None):
+        def update(self, detections, frame=None):
             return Tracks(items=(Track(track_id=42, xyxy=(0, 0, 10, 10),
                                        confidence=0.9, class_id=0),))
     pub = SnapshotPublisher()
