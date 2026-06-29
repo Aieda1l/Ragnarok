@@ -17,7 +17,7 @@ def _config_path() -> Path:
     base = Path(os.environ.get("APPDATA", Path.home())) / "Ragnarok"
     return base / "config.toml"
 
-def _build_aim_controller(cfg):
+def _build_aim_controller(cfg, commanded_buffer):
     """Build the AimController from cfg (Windows-only deps imported lazily).
 
     Wires the Phase 4 collaborators: selected aimer, motion shaper, velocity
@@ -33,7 +33,6 @@ def _build_aim_controller(cfg):
     from ragnarok.aim.controller import AimController
     from ragnarok.latency.adaptive_lead import AdaptiveLead
     from ragnarok.trigger.bot import TriggerBot
-    from ragnarok.tracking.egomotion import CommandedMotionBuffer
     from ragnarok.wiring import build_aimer, build_shaper, build_recoil
 
     a = cfg.aim
@@ -66,18 +65,21 @@ def _build_aim_controller(cfg):
         adaptive_lead=AdaptiveLead(alpha=a.lead_alpha, base_latency_s=a.lead_ms / 1000.0),
         recoil=build_recoil(cfg),
         trigger=trigger, trigger_active=trigger_active,
-        commanded_buffer=CommandedMotionBuffer(),
+        commanded_buffer=commanded_buffer,
     )
 
 def main() -> int:
     app = QApplication(sys.argv)
     cfg = load_config(_config_path())
     publisher = SnapshotPublisher()
-    aim_controller = _build_aim_controller(cfg) if cfg.aim.enabled else None
+    from ragnarok.tracking.egomotion import CommandedMotionBuffer
+    cmd_buffer = CommandedMotionBuffer()
+    aim_controller = _build_aim_controller(cfg, cmd_buffer) if cfg.aim.enabled else None
     loop = WorkerLoop(
         create_capturer(cfg.capture), create_detector(cfg.detection),
         StageProfiler(), publisher,
-        tracker=build_tracker(cfg), classifier=build_classifier(cfg),
+        tracker=build_tracker(cfg, gmc_buffer=cmd_buffer),
+        classifier=build_classifier(cfg),
         aim_controller=aim_controller,
     )
     worker = WorkerThread(loop)
