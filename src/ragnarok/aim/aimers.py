@@ -122,70 +122,92 @@ class FlickAimer(Aimer):
 # ---------------------------------------------------------------------------
 
 class FeedbackAimer(Aimer):
-    """P-controller with EMA-smoothed error, magnitude-clamped output.
+    """2-DOF PID: u = Kp·ē + Ki·∫e + Kd·d(ē)/dt + Kff·v̂ (spec §6.3).
 
-    Each frame:
-        ema = ema + alpha * (error - ema)   (seeds from raw error on first frame)
-        output = clamp(Kp * ema, max_step_px)  [magnitude clamp, not per-axis]
+    ē is the EMA-filtered error; the derivative is taken on the FILTERED error
+    (no derivative kick). Three-fold anti-windup (spec §6.3): conditional
+    integration (only when |e| <= cond_integ_thresh_px), an integral-contribution
+    clamp (±integral_clamp on Ki·∫e), and freeze-on-saturation (back out the
+    integral increment when the magnitude clamp fires). Output is magnitude-
+    clamped to min(max_step_px, remaining distance) — never overshoots.
 
-    Phase-4 hook: the *kff* parameter is stored but unused in Phase 3.
-    When Phase 4 wires velocity, callers may pass target_vel and the
-    feed-forward contribution is kff * target_vel * dt.
+    Defaults (ki=0, kd=0, integral_clamp=None, cond_integ_thresh_px=None)
+    reproduce the original P-controller behaviour exactly.
     """
 
-    def __init__(
-        self,
-        *,
-        kp: float,
-        max_step_px: float,
-        ema_alpha: float = 1.0,
-        kff: float = 0.0,
-    ) -> None:
+    def __init__(self, *, kp: float, max_step_px: float, ema_alpha: float = 1.0,
+                 kff: float = 0.0, ki: float = 0.0, kd: float = 0.0,
+                 integral_clamp: float | None = None,
+                 cond_integ_thresh_px: float | None = None) -> None:
         self._kp = kp
         self._max = max_step_px
         self._alpha = ema_alpha
-        self._kff = kff  # Phase-4 hook; currently unused
-
-        # EMA state
-        self._fx: float = 0.0
-        self._fy: float = 0.0
-        self._initialized: bool = False
+        self._kff = kff
+        self._ki = ki
+        self._kd = kd
+        self._iclamp = integral_clamp
+        self._cond = cond_integ_thresh_px
+        self._fx = 0.0
+        self._fy = 0.0
+        self._ix = 0.0
+        self._iy = 0.0
+        self._prev_fx = 0.0
+        self._prev_fy = 0.0
+        self._initialized = False
 
     def reset(self) -> None:
         self._initialized = False
+        self._ix = 0.0
+        self._iy = 0.0
 
-    def step(
-        self,
-        crosshair: tuple[float, float],
-        target_point: tuple[float, float],
-        dt: float,
-        target_vel: tuple[float, float] = (0.0, 0.0),
-    ) -> tuple[float, float]:
+    def step(self, crosshair, target_point, dt, target_vel=(0.0, 0.0)):
         ex = target_point[0] - crosshair[0]
         ey = target_point[1] - crosshair[1]
 
         if not self._initialized:
-            # Seed EMA from raw error on the first call (or after reset).
-            self._fx = ex
-            self._fy = ey
+            self._fx, self._fy = ex, ey
+            self._prev_fx, self._prev_fy = ex, ey
             self._initialized = True
+            dfx = dfy = 0.0
         else:
             a = self._alpha
             self._fx += a * (ex - self._fx)
             self._fy += a * (ey - self._fy)
+            if dt > 0.0:
+                dfx = (self._fx - self._prev_fx) / dt
+                dfy = (self._fy - self._prev_fy) / dt
+            else:
+                dfx = dfy = 0.0
+            self._prev_fx, self._prev_fy = self._fx, self._fy
 
-        # P-controller output (Phase-4 feed-forward term is kff*vel*dt; kff=0 now).
-        dx = self._kp * self._fx + self._kff * target_vel[0] * dt
-        dy = self._kp * self._fy + self._kff * target_vel[1] * dt
+        # Conditional integration (anti-windup #1).
+        e_mag = math.hypot(ex, ey)
+        integrate = self._cond is None or e_mag <= self._cond
+        inc_x = ex * dt if integrate else 0.0
+        inc_y = ey * dt if integrate else 0.0
+        self._ix += inc_x
+        self._iy += inc_y
+
+        # Integral contribution, clamped (anti-windup #2).
+        icx = self._ki * self._ix
+        icy = self._ki * self._iy
+        if self._iclamp is not None:
+            icx = max(-self._iclamp, min(self._iclamp, icx))
+            icy = max(-self._iclamp, min(self._iclamp, icy))
+
+        dx = self._kp * self._fx + icx + self._kd * dfx + self._kff * target_vel[0] * dt
+        dy = self._kp * self._fy + icy + self._kd * dfy + self._kff * target_vel[1] * dt
 
         # Magnitude clamp: never overshoot remaining distance OR max step.
         mag = math.hypot(dx, dy)
-        d = math.hypot(ex, ey)              # remaining distance to target
-        limit = min(self._max, d)           # never overshoot remaining distance OR max step
+        limit = min(self._max, e_mag)
         if mag > limit and mag > 0.0:
             scale = limit / mag
             dx *= scale
             dy *= scale
+            # Freeze-on-saturation (anti-windup #3): undo this step's integration.
+            self._ix -= inc_x
+            self._iy -= inc_y
 
         return (dx, dy)
 
