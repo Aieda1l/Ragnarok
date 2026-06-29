@@ -1,6 +1,5 @@
 """Tests for pure detection metrics against analytic cases."""
 from __future__ import annotations
-import math
 from ragnarok.training.metrics import iou, average_precision_at_iou, center_error
 
 
@@ -47,6 +46,10 @@ def test_ap_no_gt_no_preds_is_one():
 
 def test_ap_no_gt_with_preds_is_zero():
     assert average_precision_at_iou([((0, 0, 1, 1), 0.9)], [], iou_thresh=0.75) == 0.0
+
+
+def test_ap_gts_no_preds_is_zero():
+    assert average_precision_at_iou([], [(0.0, 0.0, 10.0, 10.0)], iou_thresh=0.75) == 0.0
 
 
 def test_center_error_matched_distance():
