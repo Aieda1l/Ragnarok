@@ -66,3 +66,15 @@ def test_backward_compat_without_phase4_sections():
 def test_frozen():
     with pytest.raises(Exception):
         MotionConfig().shaper = "windmouse"
+
+
+def test_aim_pid_defaults():
+    a = AimConfig()
+    assert a.ki == 0.0 and a.kd == 0.0
+    assert a.controller_mode == "p"
+    assert a.integral_clamp is None and a.cond_integ_thresh_px is None
+
+
+def test_controller_mode_validated():
+    with pytest.raises(ValidationError):
+        AimConfig(controller_mode="pdf")
