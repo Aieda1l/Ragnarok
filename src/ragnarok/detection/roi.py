@@ -6,6 +6,7 @@ engine-space detections back to full-frame coordinates. The actual pixel
 crop/resize + the real detector are box-only (worker integration).
 """
 from __future__ import annotations
+from dataclasses import dataclass
 from enum import Enum
 
 
@@ -72,3 +73,36 @@ class RoiState:
     def wants_rescan(self, frame_index: int) -> bool:
         return (self._mode == RoiMode.TRACK and self._rescan > 0
                 and frame_index % self._rescan == 0)
+
+
+@dataclass(frozen=True)
+class RoiPlan:
+    mode: RoiMode
+    region: tuple[int, int, int, int]     # (x0, y0, w, h) in full-frame pixels
+    letterboxed: bool                     # True = SEARCH (letterbox), False = TRACK (crop)
+
+
+class DynamicRoiPlanner:
+    def __init__(self, cfg) -> None:
+        self._cfg = cfg
+        self._dst = cfg.model_input_px
+        self._state = RoiState(max_missed=cfg.max_missed_frames,
+                               rescan_interval=cfg.rescan_interval_frames)
+
+    def plan(self, *, frame_w: int, frame_h: int, target_center,
+             frame_index: int, has_lock: bool) -> RoiPlan:
+        self._state.update(has_lock=has_lock)
+        if self._state.mode == RoiMode.SEARCH or self._state.wants_rescan(frame_index):
+            return RoiPlan(mode=self._state.mode, region=(0, 0, frame_w, frame_h),
+                           letterboxed=True)
+        region = crop_region_for(target_center, self._cfg.track_roi_size, frame_w, frame_h)
+        return RoiPlan(mode=self._state.mode, region=region, letterboxed=False)
+
+    def map_back(self, box, plan: RoiPlan):
+        if plan.letterboxed:
+            _x0, _y0, w, h = plan.region
+            scale, pad_x, pad_y = letterbox_params(w, h, self._dst)
+            mx1, my1, mx2, my2 = map_back_letterbox(box, scale, pad_x, pad_y)
+            return (mx1 + plan.region[0], my1 + plan.region[1],
+                    mx2 + plan.region[0], my2 + plan.region[1])
+        return map_back_crop(box, plan.region, self._dst)
