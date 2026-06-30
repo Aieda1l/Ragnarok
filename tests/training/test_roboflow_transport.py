@@ -7,9 +7,12 @@ from ragnarok.training import roboflow_client as rc
 
 def test_module_imports_without_roboflow_installed():
     # The real SDK import is lazy (inside RoboflowSdkTransport), so importing the
-    # module must succeed even though `roboflow` is not a test dependency.
+    # module must succeed even though `roboflow` is not a test dependency, and
+    # merely importing the module must NOT have imported `roboflow`.
+    import sys
     assert hasattr(rc, "RoboflowSdkTransport")
     assert hasattr(rc, "build_roboflow_transport")
+    assert "roboflow" not in sys.modules   # lazy import not triggered by import alone
 
 
 def test_build_raises_without_api_key(monkeypatch):
