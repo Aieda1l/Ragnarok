@@ -6,6 +6,7 @@ engine-space detections back to full-frame coordinates. The actual pixel
 crop/resize + the real detector are box-only (worker integration).
 """
 from __future__ import annotations
+from enum import Enum
 
 
 def letterbox_params(src_w: int, src_h: int, dst: int) -> tuple[float, float, float]:
@@ -35,3 +36,39 @@ def map_back_crop(box, crop_region, dst: int):
     r = size / dst
     x1, y1, x2, y2 = box
     return (x1 * r + x0, y1 * r + y0, x2 * r + x0, y2 * r + y0)
+
+
+class RoiMode(str, Enum):
+    SEARCH = "search"
+    TRACK = "track"
+
+
+class RoiState:
+    def __init__(self, *, max_missed: int, rescan_interval: int) -> None:
+        self._max_missed = max_missed
+        self._rescan = rescan_interval
+        self._mode = RoiMode.SEARCH
+        self._missed = 0
+
+    @property
+    def mode(self) -> RoiMode:
+        return self._mode
+
+    def update(self, *, has_lock: bool) -> RoiMode:
+        if self._mode == RoiMode.SEARCH:
+            if has_lock:
+                self._mode = RoiMode.TRACK
+                self._missed = 0
+        else:  # TRACK
+            if has_lock:
+                self._missed = 0
+            else:
+                self._missed += 1
+                if self._missed >= self._max_missed:
+                    self._mode = RoiMode.SEARCH
+                    self._missed = 0
+        return self._mode
+
+    def wants_rescan(self, frame_index: int) -> bool:
+        return (self._mode == RoiMode.TRACK and self._rescan > 0
+                and frame_index % self._rescan == 0)
