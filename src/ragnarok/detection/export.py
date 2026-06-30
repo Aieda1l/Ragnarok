@@ -12,6 +12,8 @@ _VALID_PRECISION = ("fp16", "int8")
 
 
 def engine_path_for(engines_dir: str, model: str, precision: str) -> str:
+    if precision not in _VALID_PRECISION:
+        raise ValueError(f"unknown precision {precision!r}; choose from {_VALID_PRECISION}")
     return f"{engines_dir}/rfdetr-{model}-{precision}.engine"
 
 

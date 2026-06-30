@@ -18,6 +18,8 @@ class DetectionConfig(BaseModel):
     confidence: float = Field(default=0.5, ge=0.0, le=1.0)
     optimize_fp16: bool = True   # fuse + FP16 the auto-built model (~order-of-magnitude on Ampere)
     engine_path: str = ""        # path to a built TensorRT .engine (rfdetr_trt backend)
+    # precision is consumed by the (box-only) export tooling (build_trt_command /
+    # engine_path_for); the runtime detector just loads the prebuilt engine_path.
     precision: Literal["fp16", "int8"] = "fp16"   # FP16 default; INT8 box-only (needs modelopt Q/DQ)
 
 
