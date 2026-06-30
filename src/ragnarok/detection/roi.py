@@ -95,14 +95,15 @@ class DynamicRoiPlanner:
         if self._state.mode == RoiMode.SEARCH or self._state.wants_rescan(frame_index):
             return RoiPlan(mode=self._state.mode, region=(0, 0, frame_w, frame_h),
                            letterboxed=True)
+        if target_center is None:
+            raise ValueError("target_center is required for a TRACK crop plan")
         region = crop_region_for(target_center, self._cfg.track_roi_size, frame_w, frame_h)
         return RoiPlan(mode=self._state.mode, region=region, letterboxed=False)
 
     def map_back(self, box, plan: RoiPlan):
         if plan.letterboxed:
-            _x0, _y0, w, h = plan.region
+            x0, y0, w, h = plan.region
             scale, pad_x, pad_y = letterbox_params(w, h, self._dst)
             mx1, my1, mx2, my2 = map_back_letterbox(box, scale, pad_x, pad_y)
-            return (mx1 + plan.region[0], my1 + plan.region[1],
-                    mx2 + plan.region[0], my2 + plan.region[1])
+            return (mx1 + x0, my1 + y0, mx2 + x0, my2 + y0)
         return map_back_crop(box, plan.region, self._dst)

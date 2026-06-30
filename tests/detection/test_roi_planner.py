@@ -40,8 +40,9 @@ def test_map_back_search_then_track():
     sp = p.plan(frame_w=1920, frame_h=1080, target_center=None,
                 frame_index=0, has_lock=False)
     full = p.map_back((192.0, 0.0, 384.0, 216.0), sp)       # engine-space box
-    # 1920x1080 -> scale 0.2, pad_y (384-216)/2=84; map back of (192,0,..) etc.
-    assert full[0] > 0.0 and full[2] > full[0]
+    # 1920x1080 -> scale 0.2, pad_y (384-216)/2=84; (192,0)->( (192)/0.2, (0-84)/0.2 ),
+    # (384,216)->( 384/0.2, (216-84)/0.2 ) = (960,-420,1920,660) (+region origin 0,0)
+    assert full == (960.0, -420.0, 1920.0, 660.0)
     # TRACK crop map-back lands inside the crop region
     p.plan(frame_w=1920, frame_h=1080, target_center=(500, 400),
            frame_index=1, has_lock=True)
