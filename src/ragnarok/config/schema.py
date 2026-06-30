@@ -142,6 +142,15 @@ class TrainingConfig(BaseModel):
     hard_example_conf_threshold: float = Field(default=0.5, ge=0.0, le=1.0)
 
 
+class ArduinoConfig(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    transport: Literal["serial", "udp"] = "serial"
+    port: str = ""                                  # COM/tty for the serial transport
+    baud: int = Field(default=115200, ge=1200)      # ignored on R4 native USB; for bridges
+    host: str = ""                                  # IP for the UDP/WiFi transport
+    udp_port: int = Field(default=0, ge=0, le=65535)
+
+
 class AppConfig(BaseModel):
     model_config = ConfigDict(frozen=True)
     capture: CaptureConfig = CaptureConfig()
@@ -154,3 +163,4 @@ class AppConfig(BaseModel):
     trigger: TriggerConfig = TriggerConfig()
     diagnostics: DiagnosticsConfig = DiagnosticsConfig()
     training: TrainingConfig = TrainingConfig()
+    arduino: ArduinoConfig = ArduinoConfig()
