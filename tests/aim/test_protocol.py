@@ -50,3 +50,8 @@ def test_diag_echo_decodes_micros():
     cmd, _ = p.decode_frame(p.encode_diag(seq=7))
     assert cmd == p.CMD_DIAG
     assert p.decode_diag_echo(struct.pack("<I", 1234)) == 1234
+
+
+def test_diag_echo_bad_length_raises_valueerror():
+    with pytest.raises(ValueError):
+        p.decode_diag_echo(b"\x01\x02")        # not 4 bytes -> ValueError (not struct.error)
