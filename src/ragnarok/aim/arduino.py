@@ -54,3 +54,51 @@ class ArduinoDriver(MouseDriver):
         else:
             self._mask &= ~bit
         self._t.write(p.encode_button(self._mask))
+
+
+class SerialTransport:  # pragma: no cover — box-only (real pyserial)
+    """USB-CDC byte transport over pyserial. Lazy import; box-only."""
+
+    def __init__(self, port: str, baud: int) -> None:
+        self._port, self._baud, self._ser = port, baud, None
+
+    def open(self) -> None:
+        import serial  # lazy: optional box-only dependency
+        self._ser = serial.Serial(self._port, self._baud)
+
+    def write(self, data: bytes) -> None:
+        self._ser.write(data)
+
+    def close(self) -> None:
+        if self._ser is not None:
+            self._ser.close()
+
+
+class UdpTransport:  # pragma: no cover — box-only (real socket peer)
+    """UDP/WiFi byte transport (stdlib socket). Real I/O is box-only."""
+
+    def __init__(self, host: str, udp_port: int) -> None:
+        self._addr = (host, udp_port)
+        self._sock = None
+
+    def open(self) -> None:
+        import socket
+        self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+    def write(self, data: bytes) -> None:
+        self._sock.sendto(data, self._addr)
+
+    def close(self) -> None:
+        if self._sock is not None:
+            self._sock.close()
+
+
+def build_arduino_transport(cfg):
+    a = cfg.arduino
+    if a.transport == "serial":
+        if not a.port:
+            raise RuntimeError("arduino.port must be set for the serial transport")
+        return SerialTransport(a.port, a.baud)
+    if not a.host or not a.udp_port:
+        raise RuntimeError("arduino.host and arduino.udp_port must be set for the udp transport")
+    return UdpTransport(a.host, a.udp_port)
