@@ -13,10 +13,12 @@ class CaptureConfig(BaseModel):
 
 class DetectionConfig(BaseModel):
     model_config = ConfigDict(frozen=True)
-    backend: Literal["rfdetr_torch"] = "rfdetr_torch"
+    backend: Literal["rfdetr_torch", "rfdetr_trt"] = "rfdetr_torch"
     model: Literal["nano", "small", "medium", "large"] = "small"  # Apache-2.0 variants only
     confidence: float = Field(default=0.5, ge=0.0, le=1.0)
     optimize_fp16: bool = True   # fuse + FP16 the auto-built model (~order-of-magnitude on Ampere)
+    engine_path: str = ""        # path to a built TensorRT .engine (rfdetr_trt backend)
+    precision: Literal["fp16", "int8"] = "fp16"   # FP16 default; INT8 box-only (needs modelopt Q/DQ)
 
 
 class AimConfig(BaseModel):
