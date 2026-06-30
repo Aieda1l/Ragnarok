@@ -21,7 +21,9 @@ class ArduinoDriver(MouseDriver):
     def __init__(self, *, transport, mode: int = 0, max_step: int = 127) -> None:
         self._t = transport
         self._mode = mode
-        self._max = max_step
+        # clamp to the int8 HID range (>127 can't be represented per frame) and >=1
+        # (max_step=0 would never decrement the chunk loop).
+        self._max = max(1, min(127, max_step))
         self._acc = _FracAccumulator()
         self._mask = 0
         self._connected = False

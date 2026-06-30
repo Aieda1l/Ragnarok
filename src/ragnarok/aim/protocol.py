@@ -63,5 +63,7 @@ def decode_frame(frame: bytes) -> tuple[int, bytes]:
 
 
 def decode_diag_echo(payload: bytes) -> int:
+    if len(payload) != 4:
+        raise ValueError("diag echo payload must be 4 bytes")
     (micros,) = struct.unpack("<I", payload)
     return micros

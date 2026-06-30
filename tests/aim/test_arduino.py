@@ -71,6 +71,16 @@ def test_set_button_sends_mask_and_move_carries_it():
     assert p.decode_frame(t.writes[-1])[1] == b"\x00"
 
 
+def test_max_step_clamped_to_int8_range():
+    # max_step > 127 must be clamped so MOVE frames stay within the int8 HID range.
+    t = _FakeTransport()
+    d = ArduinoDriver(transport=t, max_step=200)
+    d.connect()
+    d.move_relative(300.0, 0.0)
+    chunks = [m[0] for m in _moves(t)]
+    assert max(chunks) <= 127 and sum(chunks) == 300
+
+
 def test_close_calls_transport_close():
     t = _FakeTransport()
     d = ArduinoDriver(transport=t)
