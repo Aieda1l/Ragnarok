@@ -1,6 +1,7 @@
 """Tests for the TensorRT engine detector against a fake session (no GPU/engine)."""
 from __future__ import annotations
 import numpy as np
+import pytest
 from ragnarok.config.schema import DetectionConfig
 from ragnarok.core.types import Frame
 from ragnarok.detection.rfdetr_trt import RFDETRTensorRTDetector
@@ -39,10 +40,10 @@ def test_detect_empty_session_yields_no_detections():
 
 def test_factory_routes_trt_backend():
     # The factory must select the TRT class for backend=rfdetr_trt. With no
-    # injected session it calls _build_trt_session, which raises a DISTINCT
-    # NotImplementedError (box-only) — proving the TRT route specifically (a wrong
-    # torch route would raise ModuleNotFoundError from the lazy `import rfdetr`).
-    import pytest
+    # injected session the TRT detector calls _build_trt_session, which raises
+    # NotImplementedError — and that exception is reachable ONLY via the TRT
+    # route, so asserting it uniquely proves the routing (environment-independent;
+    # the torch route never raises NotImplementedError).
     cfg = DetectionConfig(backend="rfdetr_trt", engine_path="missing.engine")
     with pytest.raises(NotImplementedError):
         create_detector(cfg)
