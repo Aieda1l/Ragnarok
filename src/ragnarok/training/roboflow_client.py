@@ -34,3 +34,39 @@ class RoboflowClient:
         hard_ids = select_hard_examples(records, conf_threshold=conf_threshold)
         paths = [frames_by_id[i] for i in hard_ids if i in frames_by_id]
         return self.upload_frames(paths, split=split)
+
+
+class RoboflowSdkTransport:
+    """Real transport over the official `roboflow` package. BOX-ONLY (network).
+
+    The `roboflow` import is lazy so this module imports without the package in
+    CI; only live use needs `pip install roboflow`.
+    """
+
+    def __init__(self, *, api_key: str, workspace: str, project: str) -> None:
+        import roboflow  # lazy: optional box-only dependency
+        self._project = roboflow.Roboflow(api_key=api_key).workspace(workspace).project(project)
+
+    def upload_image(self, image_path: str, *, split: str) -> str:
+        self._project.upload(image_path, split=split)
+        return image_path
+
+    def download(self, version: int, fmt: str, dest: str) -> str:
+        self._project.version(version).download(fmt, location=dest)
+        return dest
+
+
+def build_roboflow_transport(cfg) -> RoboflowSdkTransport:
+    api_key = os.environ.get("RAGNAROK_ROBOFLOW_API_KEY")
+    if not api_key:
+        raise RuntimeError(
+            "RAGNAROK_ROBOFLOW_API_KEY is not set; required for Roboflow access"
+        )
+    t = cfg.training
+    if not t.roboflow_workspace or not t.roboflow_project:
+        raise RuntimeError(
+            "training.roboflow_workspace and training.roboflow_project must be configured"
+        )
+    return RoboflowSdkTransport(
+        api_key=api_key, workspace=t.roboflow_workspace, project=t.roboflow_project,
+    )
