@@ -34,3 +34,31 @@ def test_download_version_passes_through():
     out = RoboflowClient(t).download_version(3, "/data/ds", fmt="coco")
     assert t.downloaded == [(3, "coco", "/data/ds")]
     assert out == "/data/ds"
+
+
+def test_push_hard_examples_uploads_only_hard_frames():
+    t = _FakeTransport()
+    c = RoboflowClient(t)
+    records = [("a", 0.95), ("b", 0.30), ("c", None), ("d", 0.99)]   # b,c are hard
+    frames_by_id = {"a": "a.png", "b": "b.png", "c": "c.png", "d": "d.png"}
+    refs = c.push_hard_examples(records, frames_by_id, conf_threshold=0.5)
+    assert t.uploaded == [("b.png", "train"), ("c.png", "train")]
+    assert refs == ["id:b.png", "id:c.png"]
+
+
+def test_push_hard_examples_skips_ids_without_a_frame_path():
+    t = _FakeTransport()
+    c = RoboflowClient(t)
+    records = [("b", 0.1), ("missing", 0.1)]
+    frames_by_id = {"b": "b.png"}                  # 'missing' has no path
+    refs = c.push_hard_examples(records, frames_by_id, conf_threshold=0.5)
+    assert t.uploaded == [("b.png", "train")]
+    assert refs == ["id:b.png"]
+
+
+def test_push_hard_examples_empty_when_all_confident():
+    t = _FakeTransport()
+    c = RoboflowClient(t)
+    records = [("a", 0.9), ("b", 0.8)]
+    assert c.push_hard_examples(records, {"a": "a.png", "b": "b.png"}, conf_threshold=0.5) == []
+    assert t.uploaded == []

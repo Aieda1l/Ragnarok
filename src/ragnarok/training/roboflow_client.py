@@ -27,3 +27,10 @@ class RoboflowClient:
 
     def download_version(self, version: int, dest: str, *, fmt: str = "coco") -> str:
         return self._t.download(version, fmt, dest)
+
+    def push_hard_examples(self, records, frames_by_id, *, conf_threshold: float,
+                           split: str | None = None) -> list[str]:
+        from ragnarok.training.hard_examples import select_hard_examples
+        hard_ids = select_hard_examples(records, conf_threshold=conf_threshold)
+        paths = [frames_by_id[i] for i in hard_ids if i in frames_by_id]
+        return self.upload_frames(paths, split=split)
