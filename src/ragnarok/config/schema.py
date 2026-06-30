@@ -151,6 +151,15 @@ class ArduinoConfig(BaseModel):
     udp_port: int = Field(default=0, ge=0, le=65535)
 
 
+class DynamicRoiConfig(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    enabled: bool = False
+    track_roi_size: int = Field(default=192, ge=32)
+    model_input_px: int = Field(default=384, ge=64)
+    max_missed_frames: int = Field(default=5, ge=1)
+    rescan_interval_frames: int = Field(default=30, ge=0)   # 0 = no periodic rescan
+
+
 class AppConfig(BaseModel):
     model_config = ConfigDict(frozen=True)
     capture: CaptureConfig = CaptureConfig()
@@ -164,3 +173,4 @@ class AppConfig(BaseModel):
     diagnostics: DiagnosticsConfig = DiagnosticsConfig()
     training: TrainingConfig = TrainingConfig()
     arduino: ArduinoConfig = ArduinoConfig()
+    dynamic_roi: DynamicRoiConfig = DynamicRoiConfig()
