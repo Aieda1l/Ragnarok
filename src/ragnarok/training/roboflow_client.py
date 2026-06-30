@@ -8,6 +8,7 @@ box-only smoke. The API key comes from RAGNAROK_ROBOFLOW_API_KEY (never config).
 from __future__ import annotations
 
 import os
+from collections.abc import Iterable
 from typing import Protocol
 
 
@@ -21,14 +22,15 @@ class RoboflowClient:
         self._t = transport
         self._split = default_split
 
-    def upload_frames(self, image_paths, *, split: str | None = None) -> list[str]:
-        s = split or self._split
+    def upload_frames(self, image_paths: Iterable[str], *, split: str | None = None) -> list[str]:
+        s = split if split is not None else self._split
         return [self._t.upload_image(p, split=s) for p in image_paths]
 
     def download_version(self, version: int, dest: str, *, fmt: str = "coco") -> str:
         return self._t.download(version, fmt, dest)
 
-    def push_hard_examples(self, records, frames_by_id, *, conf_threshold: float,
+    def push_hard_examples(self, records: list[tuple[str, float | None]],
+                           frames_by_id: dict[str, str], *, conf_threshold: float,
                            split: str | None = None) -> list[str]:
         from ragnarok.training.hard_examples import select_hard_examples
         hard_ids = select_hard_examples(records, conf_threshold=conf_threshold)
