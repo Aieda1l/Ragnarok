@@ -13,6 +13,9 @@ BOX-ONLY DEFERRALS (perf / OS integration, not implemented here):
   * position/size the window to the captured region and translate the painter
     for multi-monitor origins.
   * full Cyberpunk restyle: glitch/chromatic-aberration, scanlines, gauges.
+  * off-screen direction hints stay latent until an off-screen target source
+    exists (full-frame detection / wider capture / coasted tracks leaving the
+    ROI); the single centered-ROI path keeps every target inside the viewport.
 """
 from __future__ import annotations
 
@@ -79,9 +82,15 @@ class FovOverlay(QWidget):
         p.drawLine(QPointF(cx - 6, cy), QPointF(cx + 6, cy))
         p.drawLine(QPointF(cx, cy - 6), QPointF(cx, cy + 6))
 
-        # markers: team-colored box + diamond for enemies; lock = red
+        # markers: team-colored box + diamond for enemies; lock = red.
+        # Targets outside the acquisition cone are dimmed (in_fov -> full accent).
         for m in scene.markers:
-            col = red if m.locked else QColor(theme.team_color(m.team))
+            if m.locked:
+                col = QColor(red)
+            else:
+                col = QColor(theme.team_color(m.team))
+                if not m.in_fov:
+                    col.setAlpha(110)
             p.setPen(QPen(col, 2 if m.locked else 1))
             x1, y1, x2, y2 = m.box
             p.drawRect(int(x1), int(y1), int(x2 - x1), int(y2 - y1))
