@@ -17,3 +17,11 @@ def test_window_handles_no_snapshot(qtbot):
     win = MainWindow(SnapshotPublisher())
     qtbot.addWidget(win)
     win.refresh()  # must not raise when latest() is None
+
+def test_main_window_embeds_controls_widget(qtbot):
+    from PySide6.QtWidgets import QLabel
+    panel = QLabel("controls")
+    win = MainWindow(SnapshotPublisher(), controls=panel)
+    qtbot.addWidget(win)
+    assert win.controls is panel
+    assert panel.parent() is not None                # actually parented into the window
