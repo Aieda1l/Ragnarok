@@ -2,7 +2,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 import os
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QTabWidget
 from ragnarok.config.store import load_config, save_config, ConfigHandle
 from ragnarok.capture.factory import create_capturer
 from ragnarok.detection.factory import create_detector
@@ -14,6 +14,7 @@ from ragnarok.gui.worker_thread import WorkerThread
 from ragnarok.gui.main_window import MainWindow
 from ragnarok.gui.overlay_window import FovOverlay
 from ragnarok.gui.tuning_panel import TuningPanel
+from ragnarok.gui.diagnostics_panel import DiagnosticsPanel
 from ragnarok.gui.live_config import AimReloader
 
 def _config_path() -> Path:
@@ -103,9 +104,15 @@ def main() -> int:
     reloader = AimReloader(loop, _build_aim_controller, commanded_buffer=cmd_buffer)
     panel = TuningPanel(handle, on_save=lambda c: save_config(c, _config_path()))
     panel.configChanged.connect(reloader.reload)
+    diagnostics = DiagnosticsPanel(handle)
+    diagnostics.configChanged.connect(reloader.reload)
+
+    tabs = QTabWidget()
+    tabs.addTab(panel, "Aim")
+    tabs.addTab(diagnostics, "Diagnostics")
 
     worker = WorkerThread(loop)
-    window = MainWindow(publisher, controls=panel)
+    window = MainWindow(publisher, controls=tabs)
     window.show()
     # Smart-lock FOV overlay: frameless/click-through, own timer, read-only.
     # Reads the LIVE config so FOV-ring / aim-point edits show immediately.
