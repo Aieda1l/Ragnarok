@@ -12,6 +12,8 @@ class TelemetrySnapshot:
     preview: np.ndarray | None   # small BGR image for the GUI, or None
     seq: int
     tracks: tuple[Track, ...] = ()  # Phase 2; default keeps Phase 1 callers working
+    locked_target_id: int | None = None      # Phase 8A: current aim lock (overlay highlight)
+    roi_region: tuple[int, int, int, int] | None = None  # Phase 8A: (l,t,r,b) screen coords of the ROI
 
 class SnapshotPublisher:
     """Single-writer (worker) / single-reader (GUI). publish() rebinds one
