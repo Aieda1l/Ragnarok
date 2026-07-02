@@ -124,3 +124,66 @@ class LockAgeTracker:
         if self._start_ns is None:
             return 0.0
         return (now_ns - self._start_ns) / 1e9
+
+
+def lock_progress(lock_age_s: float, duration_s: float) -> float:
+    """Convergence parameter for the lock-on brackets: 0 (wide) -> 1 (snapped)."""
+    if duration_s <= 0.0:
+        return 1.0
+    return max(0.0, min(1.0, lock_age_s / duration_s))
+
+
+def bracket_segments(box, t: float, gap: float, arm_len: float):
+    """L-shaped corner brackets that converge onto ``box`` as ``t`` goes 0->1.
+
+    ``t=0``: each corner sits ``gap`` px outside the box (unconverged/wide).
+    ``t=1``: each corner sits exactly on the box corner (snapped/locked).
+    Returns 8 segments (horizontal + vertical arm per corner), each a pair of
+    screen points ``((x1,y1),(x2,y2))``. Arms always point *inward*.
+    """
+    x1, y1, x2, y2 = box
+    o = gap * (1.0 - t)                      # outward offset shrinks to 0
+    L = arm_len
+    corners = (
+        (x1 - o, y1 - o, +1, +1),           # top-left    -> arms right & down
+        (x2 + o, y1 - o, -1, +1),           # top-right   -> arms left & down
+        (x1 - o, y2 + o, +1, -1),           # bottom-left -> arms right & up
+        (x2 + o, y2 + o, -1, -1),           # bottom-right-> arms left & up
+    )
+    segs: list[tuple[tuple[float, float], tuple[float, float]]] = []
+    for cx, cy, sx, sy in corners:
+        segs.append(((cx, cy), (cx + sx * L, cy)))   # horizontal arm
+        segs.append(((cx, cy), (cx, cy + sy * L)))   # vertical arm
+    return tuple(segs)
+
+
+def _in_viewport(pt, viewport) -> bool:
+    x, y = pt
+    x0, y0, x1, y1 = viewport
+    return x0 <= x <= x1 and y0 <= y <= y1
+
+
+def _ray_rect_edge(origin, target, viewport):
+    """Point where ray origin->target first crosses the viewport rectangle.
+
+    Returns ``target`` unchanged if the ray is degenerate / never hits (should
+    not happen for an off-screen target with an in-viewport origin).
+    """
+    ox, oy = origin
+    dx, dy = target[0] - ox, target[1] - oy
+    x0, y0, x1, y1 = viewport
+    eps = 1e-6
+    best: float | None = None
+    for denom, num in ((dx, x0 - ox), (dx, x1 - ox), (dy, y0 - oy), (dy, y1 - oy)):
+        if denom == 0.0:
+            continue
+        s = num / denom
+        if s <= 0.0:
+            continue
+        px, py = ox + dx * s, oy + dy * s
+        if (x0 - eps <= px <= x1 + eps) and (y0 - eps <= py <= y1 + eps):
+            if best is None or s < best:
+                best = s
+    if best is None:
+        return target
+    return (ox + dx * best, oy + dy * best)
