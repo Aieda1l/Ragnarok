@@ -26,6 +26,14 @@ class WorkerLoop:
         self._seq = 0
         self._last_ns: int | None = None
 
+    def set_aim_controller(self, controller) -> None:
+        """Atomically hot-swap the aim controller (or None to disable aim).
+
+        Single attribute rebind -> GIL-atomic; the tick loop reads self._aim
+        once per iteration, so it always sees a whole controller or None.
+        """
+        self._aim = controller
+
     def _downscale(self, image: np.ndarray) -> np.ndarray:
         h, w = image.shape[:2]
         scale = min(1.0, self._preview_max / max(h, w))
