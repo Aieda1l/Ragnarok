@@ -67,3 +67,32 @@ def test_apply_tuned_swaps_handle_with_pid_mode():
     assert h.current is new
     assert new.aim.kp == 0.5 and new.aim.ki == 0.1 and new.aim.kd == 0.02
     assert new.aim.controller_mode == "pid"
+    assert new.aim.aimer == "feedback"                  # seeds only take effect on feedback
+
+
+def test_simulate_step_flick_converges_not_diverges():
+    # Regression: the (0,0)/(e,0) drive made the latching FlickAimer diverge.
+    cfg = AppConfig().model_copy(
+        update={"aim": AppConfig().aim.model_copy(update={"aimer": "flick"})})
+    res = simulate_step(cfg, PlantParams(), setpoint=200.0, n_steps=400)
+    assert 150.0 < res.y[-1] < 260.0                    # converges near setpoint
+    assert res.overshoot_pct < 50.0                     # not a runaway ramp
+
+
+def test_is_valid_relay_rejects_sampling_floor():
+    from ragnarok.gui.diagnostics_model import is_valid_relay
+    dt = 1 / 240
+    floor = RelayTuneResult(ku=12.0, tu=4 * dt, kp=2.4, ki=299.0, kd=0.01)
+    real = RelayTuneResult(ku=5.0, tu=0.05, kp=1.0, ki=20.0, kd=0.01)
+    assert is_valid_relay(floor, dt) is False
+    assert is_valid_relay(real, dt) is True
+    assert is_valid_relay(RelayTuneResult(ku=0.0, tu=0.0, kp=0, ki=0, kd=0), dt) is False
+
+
+def test_numeric_tune_accepts_controller_structure_kwargs():
+    from ragnarok.diagnostics.numeric_tune import numeric_tune
+    p = PlantParams(lag_tau_s=0.02)
+    seeds = numeric_tune(p.make, seed=PidSeeds(0.3, 0.0, 0.0), setpoint=100.0,
+                         n_steps=120, dt_s=p.dt_s, ema_alpha=0.5,
+                         integral_clamp=50.0, cond_integ_thresh_px=30.0)
+    assert seeds.kp >= 0.0 and seeds.ki >= 0.0 and seeds.kd >= 0.0
