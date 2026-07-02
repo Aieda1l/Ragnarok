@@ -95,3 +95,48 @@ def test_ray_rect_edge_and_in_viewport():
     # toward bottom-right corner hits the corner
     edge2 = _ray_rect_edge((50.0, 50.0), (150.0, 150.0), vp)
     assert edge2 == (100.0, 100.0)
+
+
+from ragnarok.config.schema import AppConfig
+from ragnarok.telemetry.snapshot import TelemetrySnapshot
+from ragnarok.gui.overlay_model import build_scene
+
+
+def _snap(**kw):
+    base = dict(fps=1.0, loop_ms_p50=1.0, loop_ms_p99=1.0, detection_count=0,
+                preview=None, seq=1)
+    base.update(kw)
+    return TelemetrySnapshot(**base)
+
+
+def test_build_scene_no_region_is_empty():
+    scene = build_scene(snapshot=_snap(roi_region=None), cfg=AppConfig(),
+                        viewport=(0.0, 0.0, 1920.0, 1080.0), lock_age_s=0.0)
+    assert scene.has_signal is False
+
+
+def test_build_scene_locked_target_gets_brackets_and_line():
+    cfg = AppConfig()                                   # roi 384, hfov 90, screen 1920
+    # ROI centred on screen: region (768,348)-(1152,732); crosshair -> (960,540)
+    tracks = (_trk(3, (180, 150, 204, 234)),)           # enemy near crosshair
+    snap = _snap(roi_region=(768, 348, 1152, 732), tracks=tracks, locked_target_id=3)
+    scene = build_scene(snapshot=snap, cfg=cfg,
+                        viewport=(0.0, 0.0, 1920.0, 1080.0), lock_age_s=1.0)
+    assert scene.has_signal is True
+    assert scene.crosshair == (960.0, 540.0)
+    assert scene.fov is not None and scene.fov.acquire_radius < scene.fov.retain_radius
+    assert len(scene.bracket_segments) == 8             # locked target -> brackets
+    assert scene.locked_line is not None
+    assert scene.locked_line[0] == scene.crosshair
+    assert len(scene.markers) == 1
+
+
+def test_build_scene_offscreen_enemy_becomes_hint():
+    cfg = AppConfig()
+    # enemy far outside the ROI mapping -> diamond outside a tiny viewport
+    tracks = (_trk(9, (380, 380, 384, 384)),)
+    snap = _snap(roi_region=(768, 348, 1152, 732), tracks=tracks, locked_target_id=None)
+    scene = build_scene(snapshot=snap, cfg=cfg,
+                        viewport=(0.0, 0.0, 1000.0, 700.0), lock_age_s=0.0)
+    assert len(scene.offscreen) == 1
+    assert scene.offscreen[0].team == Team.ENEMY
