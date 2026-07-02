@@ -3,7 +3,7 @@ import sys
 from pathlib import Path
 import os
 from PySide6.QtWidgets import QApplication
-from ragnarok.config.store import load_config
+from ragnarok.config.store import load_config, save_config, ConfigHandle
 from ragnarok.capture.factory import create_capturer
 from ragnarok.detection.factory import create_detector
 from ragnarok.latency.profiler import StageProfiler
@@ -13,6 +13,8 @@ from ragnarok.wiring import build_tracker, build_classifier
 from ragnarok.gui.worker_thread import WorkerThread
 from ragnarok.gui.main_window import MainWindow
 from ragnarok.gui.overlay_window import FovOverlay
+from ragnarok.gui.tuning_panel import TuningPanel
+from ragnarok.gui.live_config import AimReloader
 
 def _config_path() -> Path:
     base = Path(os.environ.get("APPDATA", Path.home())) / "Ragnarok"
@@ -95,13 +97,21 @@ def main() -> int:
         classifier=build_classifier(cfg),
         aim_controller=aim_controller,
     )
+    # Live config: the tuning panel edits funnel through ConfigHandle.swap and
+    # rebuild the aim controller in-place (spec §13 immutable snapshot swap).
+    handle = ConfigHandle(cfg)
+    reloader = AimReloader(loop, _build_aim_controller, commanded_buffer=cmd_buffer)
+    panel = TuningPanel(handle, on_save=lambda c: save_config(c, _config_path()))
+    panel.configChanged.connect(reloader.reload)
+
     worker = WorkerThread(loop)
-    window = MainWindow(publisher)
+    window = MainWindow(publisher, controls=panel)
     window.show()
     # Smart-lock FOV overlay: frameless/click-through, own timer, read-only.
+    # Reads the LIVE config so FOV-ring / aim-point edits show immediately.
     # Sized ~16:9 to the configured screen width (box-only positioning refinement
     # per-monitor is deferred; see overlay_window docstring).
-    overlay = FovOverlay(publisher, lambda: cfg)
+    overlay = FovOverlay(publisher, lambda: handle.current)
     overlay.resize(cfg.aim.screen_width_px, int(cfg.aim.screen_width_px * 9 / 16))
     overlay.show()
     worker.start()

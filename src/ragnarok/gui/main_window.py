@@ -5,7 +5,7 @@ from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget, QMainWindow
 from ragnarok.telemetry.snapshot import SnapshotPublisher
 
 class MainWindow(QMainWindow):
-    def __init__(self, publisher: SnapshotPublisher) -> None:
+    def __init__(self, publisher: SnapshotPublisher, controls: QWidget | None = None) -> None:
         super().__init__()
         self.setWindowTitle("Ragnarok")
         self._pub = publisher
@@ -17,6 +17,9 @@ class MainWindow(QMainWindow):
         self.stats_label = QLabel("--")
         layout.addWidget(self.preview_label)
         layout.addWidget(self.stats_label)
+        self.controls = controls
+        if controls is not None:
+            layout.addWidget(controls)
         self.setCentralWidget(central)
 
         self._timer = QTimer(self)

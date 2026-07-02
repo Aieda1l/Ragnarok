@@ -26,6 +26,14 @@ class WorkerLoop:
         self._seq = 0
         self._last_ns: int | None = None
 
+    def set_aim_controller(self, controller) -> None:
+        """Atomically hot-swap the aim controller (or None to disable aim).
+
+        Single attribute rebind -> GIL-atomic; the tick loop reads self._aim
+        once per iteration, so it always sees a whole controller or None.
+        """
+        self._aim = controller
+
     def _downscale(self, image: np.ndarray) -> np.ndarray:
         h, w = image.shape[:2]
         scale = min(1.0, self._preview_max / max(h, w))
@@ -46,8 +54,12 @@ class WorkerLoop:
         tracks = self._classifier.classify(tracks, frame.image)
         t_cls = now_ns()
 
-        if self._aim is not None:
-            self._aim.update(tracks, frame.t_capture_ns)
+        # Snapshot the controller ONCE: the GUI thread may hot-swap self._aim
+        # (incl. to None on a live disable) at any moment, so a fresh load for
+        # the guard vs. the call would be a TOCTOU race (None.update()).
+        aim = self._aim
+        if aim is not None:
+            aim.update(tracks, frame.t_capture_ns)
         t_aim = now_ns()
 
         self._profiler.record("capture", t_cap - t0)
@@ -73,7 +85,7 @@ class WorkerLoop:
             fps=fps, loop_ms_p50=p50, loop_ms_p99=p99,
             detection_count=len(dets), preview=preview, seq=self._seq,
             tracks=tuple(tracks),
-            locked_target_id=getattr(self._aim, "target_id", None),
+            locked_target_id=getattr(aim, "target_id", None),
             roi_region=frame.region,
         ))
 
