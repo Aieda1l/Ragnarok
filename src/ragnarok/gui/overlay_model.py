@@ -187,3 +187,48 @@ def _ray_rect_edge(origin, target, viewport):
     if best is None:
         return target
     return (ox + dx * best, oy + dy * best)
+
+
+def build_scene(*, snapshot, cfg, viewport, lock_age_s: float,
+                bracket_gap: float = 28.0, bracket_arm: float = 16.0,
+                bracket_anim_s: float = 0.18) -> OverlayScene:
+    """Assemble the full ``OverlayScene`` from a telemetry snapshot + config.
+
+    Returns an empty (no-signal) scene when the snapshot has no ROI region.
+    ``viewport`` is the overlay's screen rect ``(x0,y0,x1,y1)`` used for the
+    off-screen direction hints. ``lock_age_s`` drives the bracket convergence.
+    """
+    region = snapshot.roi_region
+    if region is None:
+        return OverlayScene.empty()
+
+    roi = cfg.capture.roi_size
+    smap = ScreenMap.from_region(region, roi, roi)
+    crosshair = smap.pt(roi / 2.0, roi / 2.0)
+
+    a = cfg.aim
+    fov_px = fov_deg_to_radius_px(a.aim_fov_deg, a.hfov_deg, a.screen_width_px)
+    retain_px = fov_deg_to_radius_px(a.retain_fov_deg, a.hfov_deg, a.screen_width_px)
+    fov = FovRing(center=crosshair, acquire_radius=fov_px, retain_radius=retain_px)
+
+    markers = build_markers(snapshot.tracks, smap, crosshair, fov_px,
+                            snapshot.locked_target_id, a.head_frac, a.aim_point)
+
+    segs: tuple = ()
+    line = None
+    locked = next((m for m in markers if m.locked), None)
+    if locked is not None:
+        t = lock_progress(lock_age_s, bracket_anim_s)
+        segs = bracket_segments(locked.box, t, bracket_gap, bracket_arm)
+        line = (crosshair, locked.diamond)
+
+    hints: list[OffscreenHint] = []
+    for m in markers:
+        if m.team is Team.ENEMY and not _in_viewport(m.diamond, viewport):
+            edge = _ray_rect_edge(crosshair, m.diamond, viewport)
+            ang = math.atan2(m.diamond[1] - crosshair[1], m.diamond[0] - crosshair[0])
+            hints.append(OffscreenHint(angle_rad=ang, edge_point=edge, team=m.team))
+
+    return OverlayScene(has_signal=True, crosshair=crosshair, fov=fov,
+                        markers=markers, bracket_segments=segs,
+                        locked_line=line, offscreen=tuple(hints))
