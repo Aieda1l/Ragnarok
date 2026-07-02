@@ -57,3 +57,33 @@ def format_result(result: StepResponseResult) -> dict[str, str]:
         "Settling": _fmt_ms(result.settling_s),
         "Dead time": _fmt_ms(result.dead_time_s),
     }
+
+
+def relay_tune(params: PlantParams, *, d: float = 50.0, n_steps: int = 3000,
+               rule: str = "low_overshoot"):
+    """Relay-feedback (Åström-Hägglund) auto-tune against the plant model."""
+    from ragnarok.diagnostics.relay_experiment import run_relay_tune
+    return run_relay_tune(params.make(), d=d, n_steps=n_steps, dt_s=params.dt_s,
+                          rule=rule)
+
+
+def numeric_tune_from(cfg, params: PlantParams, *, setpoint: float = 200.0,
+                      n_steps: int = 240):
+    """Nelder-Mead ITAE tune seeded from the current config's PID gains."""
+    from ragnarok.diagnostics.numeric_tune import numeric_tune, PidSeeds
+    seed = PidSeeds(kp=cfg.aim.kp, ki=cfg.aim.ki, kd=cfg.aim.kd)
+    return numeric_tune(params.make, seed=seed, setpoint=setpoint,
+                        n_steps=n_steps, dt_s=params.dt_s,
+                        max_step_px=cfg.aim.max_step_px)
+
+
+def format_seeds(seeds) -> dict[str, str]:
+    return {"Kp": f"{seeds.kp:.4g}", "Ki": f"{seeds.ki:.4g}", "Kd": f"{seeds.kd:.4g}"}
+
+
+def apply_tuned(handle, seeds, *, controller_mode: str = "pid"):
+    """Apply auto-tune seeds into a NEW frozen AppConfig and swap the handle."""
+    from ragnarok.diagnostics.apply import apply_seeds
+    new_cfg = apply_seeds(handle.current, seeds, controller_mode=controller_mode)
+    handle.swap(new_cfg)
+    return new_cfg
