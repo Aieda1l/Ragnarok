@@ -84,3 +84,43 @@ class OverlayScene:
     def empty(cls) -> "OverlayScene":
         return cls(has_signal=False, crosshair=(0.0, 0.0), fov=None, markers=(),
                    bracket_segments=(), locked_line=None, offscreen=())
+
+
+def build_markers(tracks, smap: ScreenMap, crosshair: tuple[float, float],
+                  fov_px: float, locked_id: int | None,
+                  head_frac: float, aim_mode: str) -> tuple[TargetMarker, ...]:
+    """One ``TargetMarker`` per track, in screen coords.
+
+    ``in_fov`` compares the screen-space crosshair->aim-point distance to
+    ``fov_px`` (both screen px; scale is 1.0 on the normal capture path).
+    """
+    out: list[TargetMarker] = []
+    for tr in tracks:
+        apx, apy = aim_point(tr, head_frac, aim_mode)
+        diamond = smap.pt(apx, apy)
+        d = math.hypot(diamond[0] - crosshair[0], diamond[1] - crosshair[1])
+        out.append(TargetMarker(
+            track_id=tr.track_id, box=smap.rect(tr.xyxy), diamond=diamond,
+            team=tr.team, confidence=tr.confidence,
+            locked=(locked_id is not None and tr.track_id == locked_id),
+            in_fov=(d <= fov_px),
+        ))
+    return tuple(out)
+
+
+class LockAgeTracker:
+    """Tracks how long the current lock has been held, for the lock-on
+    convergence animation. Clock-agnostic: the caller passes ``now_ns`` each
+    frame (widget uses ``core.clock.now_ns``; tests pass explicit values)."""
+
+    def __init__(self) -> None:
+        self._locked: int | None = None
+        self._start_ns: int | None = None
+
+    def update(self, locked_id: int | None, now_ns: int) -> float:
+        if locked_id != self._locked:
+            self._locked = locked_id
+            self._start_ns = now_ns if locked_id is not None else None
+        if self._start_ns is None:
+            return 0.0
+        return (now_ns - self._start_ns) / 1e9
