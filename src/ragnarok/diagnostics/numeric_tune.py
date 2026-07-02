@@ -24,10 +24,17 @@ class PidSeeds:
 
 def numeric_tune(plant_factory, *, seed: PidSeeds, setpoint: float, n_steps: int,
                  dt_s: float, max_step_px: float = 1e9, w_overshoot: float = 1.0,
-                 w_effort: float = 0.0) -> PidSeeds:
+                 w_effort: float = 0.0, ema_alpha: float = 1.0,
+                 integral_clamp: float | None = None,
+                 cond_integ_thresh_px: float | None = None) -> PidSeeds:
+    # ema_alpha / anti-windup default to the un-smoothed loop (back-compat), but
+    # callers optimizing for a DEPLOYED controller must pass the cfg values so the
+    # optimized aimer is structurally identical to build_aimer(cfg).
     def cost(theta) -> float:
         kp, ki, kd = (max(0.0, float(v)) for v in theta)   # gains are non-negative
-        aimer = FeedbackAimer(kp=kp, ki=ki, kd=kd, max_step_px=max_step_px, ema_alpha=1.0)
+        aimer = FeedbackAimer(kp=kp, ki=ki, kd=kd, max_step_px=max_step_px,
+                              ema_alpha=ema_alpha, integral_clamp=integral_clamp,
+                              cond_integ_thresh_px=cond_integ_thresh_px)
         t, m, u = simulate_closed_loop(
             lambda e, dt: aimer.step((0.0, 0.0), (e, 0.0), dt)[0],
             plant_factory(), setpoint=setpoint, n_steps=n_steps, dt_s=dt_s,

@@ -13,8 +13,8 @@ from PySide6.QtWidgets import (
 )
 
 from ragnarok.gui.diagnostics_model import (
-    PlantParams, apply_tuned, format_result, format_seeds, numeric_tune_from,
-    relay_tune, simulate_step,
+    PlantParams, apply_tuned, format_result, format_seeds, is_valid_relay,
+    numeric_tune_from, relay_tune, simulate_step,
 )
 
 
@@ -36,7 +36,10 @@ class DiagnosticsPanel(QWidget):
         for key, label, lo, hi, step, default in (
             ("gain", "Plant gain", 0.01, 10.0, 0.1, 1.0),
             ("lag_tau_s", "Actuator lag (ms)", 0.0, 200.0, 1.0, 20.0),
-            ("dead_time_s", "Dead time (ms)", 0.0, 200.0, 1.0, 0.0),
+            # nonzero default: the aim loop's real capture->render->actuation
+            # transport delay gives the relay experiment a true phase crossover
+            # (a pure integrator+lag has none -> only a bogus sampling-floor cycle).
+            ("dead_time_s", "Dead time (ms)", 0.0, 200.0, 1.0, 8.0),
             ("setpoint", "Step (px)", 1.0, 2000.0, 10.0, 200.0),
             ("n_steps", "Sim steps", 20.0, 4000.0, 20.0, 240.0),
         ):
@@ -99,7 +102,13 @@ class DiagnosticsPanel(QWidget):
         self._show_metrics(res)
 
     def _run_relay(self) -> None:
-        res = relay_tune(self._plant_params(), n_steps=self._relay_steps)
+        params = self._plant_params()
+        res = relay_tune(params, n_steps=self._relay_steps)
+        if not is_valid_relay(res, params.dt_s):
+            # sampling-floor pseudo-cycle -> garbage gains; refuse to seed them.
+            self.last_seeds = None
+            self.seeds_label.setText("Kp —  Ki —  Kd —   (no valid limit cycle — add dead time)")
+            return
         from ragnarok.diagnostics.numeric_tune import PidSeeds
         self.last_seeds = PidSeeds(kp=res.kp, ki=res.ki, kd=res.kd)
         self._show_seeds(self.last_seeds)
