@@ -112,3 +112,19 @@ def test_set_aim_controller_hotswaps_and_can_disable():
     loop.set_aim_controller(None)                  # disable aim live
     loop.tick()
     assert pub.latest().locked_target_id is None
+
+def test_tick_snapshots_aim_controller_against_midtick_swap():
+    # Regression: a live disable (set_aim_controller(None)) landing mid-tick must
+    # not crash tick(); tick snapshots self._aim once so guard/call/publish all
+    # see the same reference (no None.update() TOCTOU).
+    pub = SnapshotPublisher()
+    holder = {}
+    class _Aim:
+        target_id = 7
+        def update(self, tracks, t_ns):
+            holder["loop"].set_aim_controller(None)   # GUI-thread disable, mid-update
+    loop = WorkerLoop(_Cap(), _Det(), StageProfiler(), pub, aim_controller=_Aim())
+    holder["loop"] = loop
+    loop.tick()                                       # must not raise
+    assert pub.latest().locked_target_id == 7         # from the snapshotted controller
+    assert loop._aim is None                           # the swap did take effect
