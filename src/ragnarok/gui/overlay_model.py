@@ -222,6 +222,11 @@ def build_scene(*, snapshot, cfg, viewport, lock_age_s: float,
         segs = bracket_segments(locked.box, t, bracket_gap, bracket_arm)
         line = (crosshair, locked.diamond)
 
+    # Off-screen direction hints. NOTE: with the current single centered-ROI
+    # capture path every detected target is inside the ROI and therefore inside
+    # the viewport, so this stays empty at runtime; it fires once an off-screen
+    # target source exists (full-frame detection, wider capture, or coasted
+    # tracks that leave the ROI). The geometry is exercised by the unit tests.
     hints: list[OffscreenHint] = []
     for m in markers:
         if m.team is Team.ENEMY and not _in_viewport(m.diamond, viewport):
