@@ -73,3 +73,23 @@ def test_aim_stage_recorded_when_controller_present():
     prof = StageProfiler()
     WorkerLoop(_Cap(), _Det(), prof, SnapshotPublisher(), aim_controller=_Aim()).tick()
     assert "aim" in prof.stages()
+
+def test_loop_publishes_lock_and_region():
+    class _CapR(_Cap):
+        def grab(self):
+            return Frame(np.zeros((384, 384, 3), np.uint8),
+                         t_capture_ns=0, region=(100, 50, 484, 434))
+    class _Aim:
+        target_id = 42
+        def update(self, tracks, t_ns): ...
+    pub = SnapshotPublisher()
+    WorkerLoop(_CapR(), _Det(), StageProfiler(), pub, aim_controller=_Aim()).tick()
+    snap = pub.latest()
+    assert snap.locked_target_id == 42
+    assert snap.roi_region == (100, 50, 484, 434)
+
+def test_loop_lock_id_none_without_controller():
+    pub = SnapshotPublisher()
+    WorkerLoop(_Cap(), _Det(), StageProfiler(), pub).tick()
+    assert pub.latest().locked_target_id is None
+    assert pub.latest().roi_region == (0, 0, 384, 384)

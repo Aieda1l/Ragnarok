@@ -73,6 +73,8 @@ class WorkerLoop:
             fps=fps, loop_ms_p50=p50, loop_ms_p99=p99,
             detection_count=len(dets), preview=preview, seq=self._seq,
             tracks=tuple(tracks),
+            locked_target_id=getattr(self._aim, "target_id", None),
+            roi_region=frame.region,
         ))
 
     def run(self, stop_event: threading.Event) -> None:
