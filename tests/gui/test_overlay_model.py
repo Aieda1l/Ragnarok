@@ -59,3 +59,39 @@ def test_lock_age_tracker_resets_on_change():
     assert t.update(5, 1_500_000_000) == 0.5        # 0.5 s later
     assert t.update(6, 1_600_000_000) == 0.0        # switched lock -> reset
     assert t.update(None, 2_000_000_000) == 0.0     # lock dropped -> 0
+
+
+from ragnarok.gui.overlay_model import (
+    lock_progress, bracket_segments, _ray_rect_edge, _in_viewport)
+
+
+def test_lock_progress_clamps():
+    assert lock_progress(-1.0, 0.2) == 0.0
+    assert lock_progress(0.1, 0.2) == 0.5
+    assert lock_progress(5.0, 0.2) == 1.0
+    assert lock_progress(0.0, 0.0) == 1.0            # zero-duration -> snapped
+
+
+def test_bracket_segments_converge():
+    box = (100.0, 100.0, 200.0, 200.0)
+    # t=1: top-left corner arm starts exactly at (100,100)
+    snapped = bracket_segments(box, t=1.0, gap=20.0, arm_len=10.0)
+    tl_h = snapped[0]                                # first corner, horizontal arm
+    assert tl_h[0] == (100.0, 100.0)
+    assert tl_h[1] == (110.0, 100.0)                 # arm extends inward +x
+    # t=0: same corner is offset gap px up-and-left (unconverged/wide)
+    wide = bracket_segments(box, t=0.0, gap=20.0, arm_len=10.0)
+    assert wide[0][0] == (80.0, 80.0)
+    assert len(snapped) == 8                          # 4 corners x 2 arms
+
+
+def test_ray_rect_edge_and_in_viewport():
+    vp = (0.0, 0.0, 100.0, 100.0)
+    assert _in_viewport((50.0, 50.0), vp) is True
+    assert _in_viewport((150.0, 50.0), vp) is False
+    # ray from centre toward a point far to the right hits the x=100 edge at y=50
+    edge = _ray_rect_edge((50.0, 50.0), (500.0, 50.0), vp)
+    assert edge == (100.0, 50.0)
+    # toward bottom-right corner hits the corner
+    edge2 = _ray_rect_edge((50.0, 50.0), (150.0, 150.0), vp)
+    assert edge2 == (100.0, 100.0)
