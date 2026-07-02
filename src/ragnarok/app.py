@@ -12,6 +12,7 @@ from ragnarok.worker.loop import WorkerLoop
 from ragnarok.wiring import build_tracker, build_classifier
 from ragnarok.gui.worker_thread import WorkerThread
 from ragnarok.gui.main_window import MainWindow
+from ragnarok.gui.overlay_window import FovOverlay
 
 def _config_path() -> Path:
     base = Path(os.environ.get("APPDATA", Path.home())) / "Ragnarok"
@@ -97,6 +98,12 @@ def main() -> int:
     worker = WorkerThread(loop)
     window = MainWindow(publisher)
     window.show()
+    # Smart-lock FOV overlay: frameless/click-through, own timer, read-only.
+    # Sized ~16:9 to the configured screen width (box-only positioning refinement
+    # per-monitor is deferred; see overlay_window docstring).
+    overlay = FovOverlay(publisher, lambda: cfg)
+    overlay.resize(cfg.aim.screen_width_px, int(cfg.aim.screen_width_px * 9 / 16))
+    overlay.show()
     worker.start()
     app.aboutToQuit.connect(worker.stop)
     return app.exec()
