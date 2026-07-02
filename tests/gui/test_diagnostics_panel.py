@@ -21,6 +21,16 @@ def test_run_relay_sets_seeds(qtbot):
     assert "Kp" in panel.seeds_label.text()
 
 
+def test_run_relay_rejects_sampling_floor(qtbot):
+    panel = DiagnosticsPanel(ConfigHandle(AppConfig()))
+    qtbot.addWidget(panel)
+    panel.widget_for("dead_time_s").setValue(0.0)          # no dead time -> no real cycle
+    panel.widget_for("lag_tau_s").setValue(20.0)
+    panel._run_relay()
+    assert panel.last_seeds is None                         # garbage floor seeds refused
+    assert "no valid limit cycle" in panel.seeds_label.text()
+
+
 def test_run_numeric_sets_seeds(qtbot):
     panel = DiagnosticsPanel(ConfigHandle(AppConfig()))
     qtbot.addWidget(panel)
