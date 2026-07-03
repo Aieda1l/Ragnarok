@@ -43,6 +43,25 @@ class TuningPanel(QWidget):
     def widget_for(self, path: str) -> QWidget:
         return self._widgets[path]
 
+    def refresh(self) -> None:
+        """Repaint every widget from the live config (e.g. after a profile load).
+
+        Signals are blocked so setting a value does not re-fire _commit (which
+        would feed back into ConfigHandle / trigger a needless worker reload)."""
+        cfg = self._handle.current
+        for path, w in self._widgets.items():
+            value = get_field(cfg, path)
+            w.blockSignals(True)
+            try:
+                if isinstance(w, QCheckBox):
+                    w.setChecked(bool(value))
+                elif isinstance(w, QComboBox):
+                    w.setCurrentText(str(value))
+                else:
+                    w.setValue(float(value))
+            finally:
+                w.blockSignals(False)
+
     # -- construction ----------------------------------------------------
     def _build_widget(self, spec, value) -> QWidget:
         path = spec.path

@@ -59,6 +59,21 @@ def test_loaded_out_of_gui_range_value_is_not_clamped(qtbot):
     assert panel.widget_for("recoil.scale").value() == 8.0
 
 
+def test_refresh_repaints_widgets_without_recommitting(qtbot):
+    h = ConfigHandle(AppConfig())
+    panel = TuningPanel(h)
+    qtbot.addWidget(panel)
+    # swap in a new config behind the panel's back, then refresh
+    new = AppConfig().model_copy(update={"aim": AppConfig().aim.model_copy(
+        update={"kp": 1.23, "enabled": True, "aimer": "hybrid"})})
+    h.swap(new)
+    with qtbot.assertNotEmitted(panel.configChanged):        # refresh must not re-commit
+        panel.refresh()
+    assert panel.widget_for("aim.kp").value() == 1.23
+    assert panel.widget_for("aim.enabled").isChecked() is True
+    assert panel.widget_for("aim.aimer").currentText() == "hybrid"
+
+
 def test_save_button_invokes_callback(qtbot):
     h = ConfigHandle(AppConfig())
     saved = {}
