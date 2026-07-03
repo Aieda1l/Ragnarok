@@ -58,9 +58,22 @@ class TuningPanel(QWidget):
                 elif isinstance(w, QComboBox):
                     w.setCurrentText(str(value))
                 else:
+                    self._fit_range(w, value)
                     w.setValue(float(value))
             finally:
                 w.blockSignals(False)
+
+    @staticmethod
+    def _fit_range(w, value) -> None:
+        """Expand the spin box range to include a loaded value rather than
+        clamping it. Some fields are schema-unbounded beyond the default GUI
+        range; a profile/config value past the cap must display (and re-commit)
+        faithfully, not be silently downgraded."""
+        v = float(value)
+        if v < w.minimum():
+            w.setMinimum(v)
+        if v > w.maximum():
+            w.setMaximum(v)
 
     # -- construction ----------------------------------------------------
     def _build_widget(self, spec, value) -> QWidget:
@@ -85,6 +98,7 @@ class TuningPanel(QWidget):
             w.setMaximum(spec.maximum)
         if spec.step is not None:
             w.setSingleStep(spec.step)
+        self._fit_range(w, value)                       # never clamp a loaded value
         w.setValue(float(value))
         w.editingFinished.connect(lambda p=path: self._commit(p))
         return w
