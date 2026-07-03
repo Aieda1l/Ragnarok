@@ -60,9 +60,9 @@ TRACKING_FIELDS: tuple[FieldSpec, ...] = (
     FieldSpec("tracking.match_thresh", "Match thresh", "float", 0.0, 1.0, 0.01),
     FieldSpec("tracking.proximity_thresh", "Proximity thresh", "float", 0.0, 1.0, 0.01),
     FieldSpec("tracking.gmc", "GMC", "choice", choices=("off", "feedforward")),
-    # deg_per_count is schema-unbounded and signed; use a large cap so a
-    # hand-edited config value is never silently clamped on display (8D review).
-    FieldSpec("tracking.deg_per_count", "deg/count (signed)", "float", -1e6, 1e6, 0.001),
+    # deg_per_count is schema-unbounded and signed; the sane default range below
+    # is auto-expanded by TuningPanel._fit_range for any larger loaded value.
+    FieldSpec("tracking.deg_per_count", "deg/count (signed)", "float", -1.0, 1.0, 0.001),
     FieldSpec("tracking.tau_render_s", "τ_render (s)", "float", 0.0, 0.1, 0.001),
 )
 
@@ -85,17 +85,17 @@ TRIGGER_FIELDS: tuple[FieldSpec, ...] = (
 )
 
 # recoil.scale / motion.gravity / motion.wind are schema-unbounded above (ge=0.0,
-# no le); use a large cap so a hand-edited config value is never silently clamped
-# on display (8D review). The step keeps ordinary spinning sane.
+# no le); the sane default caps below are auto-expanded by TuningPanel._fit_range
+# for any larger loaded value, so nothing is ever silently clamped/downgraded.
 RECOIL_FIELDS: tuple[FieldSpec, ...] = (
     FieldSpec("recoil.enabled", "Recoil comp enabled", "bool"),
-    FieldSpec("recoil.scale", "Recoil scale", "float", 0.0, 1e6, 0.1),
+    FieldSpec("recoil.scale", "Recoil scale", "float", 0.0, 5.0, 0.1),
 )
 
 MOTION_FIELDS: tuple[FieldSpec, ...] = (
     FieldSpec("motion.shaper", "Motion shaper", "choice", choices=("none", "windmouse")),
-    FieldSpec("motion.gravity", "WindMouse gravity", "float", 0.0, 1e6, 0.5),
-    FieldSpec("motion.wind", "WindMouse wind", "float", 0.0, 1e6, 0.5),
+    FieldSpec("motion.gravity", "WindMouse gravity", "float", 0.0, 50.0, 0.5),
+    FieldSpec("motion.wind", "WindMouse wind", "float", 0.0, 20.0, 0.5),
     FieldSpec("motion.max_step", "WindMouse max step", "float", 1.0, 100.0, 1.0),
     FieldSpec("motion.target_area", "WindMouse target area", "float", 1.0, 100.0, 1.0),
 )
