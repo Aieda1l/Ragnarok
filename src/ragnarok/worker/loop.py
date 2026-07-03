@@ -34,6 +34,17 @@ class WorkerLoop:
         """
         self._aim = controller
 
+    def set_tracker(self, tracker) -> None:
+        """Atomically hot-swap the tracker (None restores the identity default).
+
+        The tick reads self._tracker exactly once per iteration, so a rebind is
+        race-free (a tick sees a whole tracker, never a partial one)."""
+        self._tracker = tracker if tracker is not None else IdentityTracker()
+
+    def set_classifier(self, classifier) -> None:
+        """Atomically hot-swap the friend/foe classifier (None restores null)."""
+        self._classifier = classifier if classifier is not None else NullClassifier()
+
     def _downscale(self, image: np.ndarray) -> np.ndarray:
         h, w = image.shape[:2]
         scale = min(1.0, self._preview_max / max(h, w))
