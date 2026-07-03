@@ -14,6 +14,10 @@ from ragnarok.config.schema import AppConfig
 from ragnarok.config.store import load_config, save_config
 
 _NAME_RE = re.compile(r"^[A-Za-z0-9 _-]+$")
+# Windows reserves these device basenames regardless of extension; the app is
+# win32-only, so a profile named "CON"/"NUL"/"COM1" would raise from the OS on save.
+_RESERVED = {"CON", "PRN", "AUX", "NUL",
+             *(f"COM{i}" for i in range(1, 10)), *(f"LPT{i}" for i in range(1, 10))}
 
 
 class ProfileStore:
@@ -21,7 +25,7 @@ class ProfileStore:
         self._dir = Path(directory)
 
     def path_for(self, name: str) -> Path:
-        if not name or not _NAME_RE.fullmatch(name):
+        if not name or not _NAME_RE.fullmatch(name) or name.upper() in _RESERVED:
             raise ValueError(f"invalid profile name {name!r}")
         return self._dir / f"{name}.toml"
 
