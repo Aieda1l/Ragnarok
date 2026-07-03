@@ -38,5 +38,13 @@ def test_invalid_names_rejected(tmp_path):
             store.path_for(bad)
 
 
+def test_windows_reserved_names_rejected(tmp_path):
+    store = ProfileStore(tmp_path)
+    for bad in ("CON", "nul", "Com1", "LPT9", "aux"):     # case-insensitive
+        with pytest.raises(ValueError):
+            store.path_for(bad)
+    store.path_for("CONVERT")                             # not reserved -> ok
+
+
 def test_list_empty_when_dir_absent(tmp_path):
     assert ProfileStore(tmp_path / "does_not_exist").list() == []
