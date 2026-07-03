@@ -113,6 +113,28 @@ def test_set_aim_controller_hotswaps_and_can_disable():
     loop.tick()
     assert pub.latest().locked_target_id is None
 
+def test_set_tracker_and_classifier_hotswap():
+    from ragnarok.core.types import Track, Tracks
+    class _Trk:
+        def __init__(self, tid): self.tid = tid
+        def update(self, detections, frame=None):
+            return Tracks(items=(Track(track_id=self.tid, xyxy=(0, 0, 10, 10),
+                                       confidence=0.9, class_id=0),))
+    class _Cls:
+        def __init__(self, tag): self.tag = tag; self.seen = 0
+        def classify(self, tracks, image): self.seen += 1; return tracks
+    pub = SnapshotPublisher()
+    loop = WorkerLoop(_Cap(), _Det(), StageProfiler(), pub, tracker=_Trk(1))
+    loop.tick()
+    assert pub.latest().tracks[0].track_id == 1
+    loop.set_tracker(_Trk(9))
+    loop.tick()
+    assert pub.latest().tracks[0].track_id == 9
+    cls = _Cls("x")
+    loop.set_classifier(cls)
+    loop.tick()
+    assert cls.seen == 1
+
 def test_tick_snapshots_aim_controller_against_midtick_swap():
     # Regression: a live disable (set_aim_controller(None)) landing mid-tick must
     # not crash tick(); tick snapshots self._aim once so guard/call/publish all
