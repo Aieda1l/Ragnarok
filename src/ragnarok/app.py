@@ -14,8 +14,10 @@ from ragnarok.gui.worker_thread import WorkerThread
 from ragnarok.gui.main_window import MainWindow
 from ragnarok.gui.overlay_window import FovOverlay
 from ragnarok.gui.tuning_panel import TuningPanel
+from ragnarok.gui.tuning_model import (
+    TRACKING_FIELDS, CLASSIFICATION_FIELDS, TRIGGER_FIELDS, RECOIL_FIELDS, MOTION_FIELDS)
 from ragnarok.gui.diagnostics_panel import DiagnosticsPanel
-from ragnarok.gui.live_config import AimReloader
+from ragnarok.gui.live_config import AimReloader, WorkerReloader
 
 def _config_path() -> Path:
     base = Path(os.environ.get("APPDATA", Path.home())) / "Ragnarok"
@@ -101,15 +103,30 @@ def main() -> int:
     # Live config: the tuning panel edits funnel through ConfigHandle.swap and
     # rebuild the aim controller in-place (spec §13 immutable snapshot swap).
     handle = ConfigHandle(cfg)
-    reloader = AimReloader(loop, _build_aim_controller, commanded_buffer=cmd_buffer)
-    panel = TuningPanel(handle, on_save=lambda c: save_config(c, _config_path()))
-    panel.configChanged.connect(reloader.reload)
-    diagnostics = DiagnosticsPanel(handle)
-    diagnostics.configChanged.connect(reloader.reload)
+    aim_reloader = AimReloader(loop, _build_aim_controller, commanded_buffer=cmd_buffer)
+    reloader = WorkerReloader(
+        loop, aim_reloader=aim_reloader,
+        build_tracker=build_tracker, build_classifier=build_classifier,
+        commanded_buffer=cmd_buffer, initial_cfg=cfg)
+
+    def _save(c):
+        save_config(c, _config_path())
 
     tabs = QTabWidget()
-    tabs.addTab(panel, "Aim")
+    aim_panel = TuningPanel(handle, on_save=_save)
+    aim_panel.configChanged.connect(reloader.reload)
+    tabs.addTab(aim_panel, "Aim")
+    diagnostics = DiagnosticsPanel(handle)
+    diagnostics.configChanged.connect(reloader.reload)
     tabs.addTab(diagnostics, "Diagnostics")
+    for fields, title in ((TRACKING_FIELDS, "Tracking"),
+                          (CLASSIFICATION_FIELDS, "Friend/Foe"),
+                          (TRIGGER_FIELDS, "Trigger"),
+                          (RECOIL_FIELDS, "Recoil"),
+                          (MOTION_FIELDS, "Motion")):
+        p = TuningPanel(handle, fields=fields, on_save=_save)
+        p.configChanged.connect(reloader.reload)
+        tabs.addTab(p, title)
 
     worker = WorkerThread(loop)
     window = MainWindow(publisher, controls=tabs)
