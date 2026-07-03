@@ -17,11 +17,16 @@ from ragnarok.gui.tuning_panel import TuningPanel
 from ragnarok.gui.tuning_model import (
     TRACKING_FIELDS, CLASSIFICATION_FIELDS, TRIGGER_FIELDS, RECOIL_FIELDS, MOTION_FIELDS)
 from ragnarok.gui.diagnostics_panel import DiagnosticsPanel
+from ragnarok.gui.profiles_panel import ProfilesPanel
 from ragnarok.gui.live_config import AimReloader, WorkerReloader
+from ragnarok.config.profiles import ProfileStore
 
 def _config_path() -> Path:
     base = Path(os.environ.get("APPDATA", Path.home())) / "Ragnarok"
     return base / "config.toml"
+
+def _profiles_dir() -> Path:
+    return _config_path().parent / "profiles"
 
 def _build_aim_controller(cfg, commanded_buffer):
     """Build the AimController from cfg (Windows-only deps imported lazily).
@@ -112,12 +117,21 @@ def main() -> int:
     def _save(c):
         save_config(c, _config_path())
 
+    tuning_panels: list[TuningPanel] = []
+
+    def _on_config_changed(new_cfg):
+        # any panel edit / profile load: repaint the other tabs, then hot-reload
+        for tp in tuning_panels:
+            tp.refresh()
+        reloader.reload(new_cfg)
+
     tabs = QTabWidget()
     aim_panel = TuningPanel(handle, on_save=_save)
-    aim_panel.configChanged.connect(reloader.reload)
+    aim_panel.configChanged.connect(_on_config_changed)
+    tuning_panels.append(aim_panel)
     tabs.addTab(aim_panel, "Aim")
     diagnostics = DiagnosticsPanel(handle)
-    diagnostics.configChanged.connect(reloader.reload)
+    diagnostics.configChanged.connect(_on_config_changed)
     tabs.addTab(diagnostics, "Diagnostics")
     for fields, title in ((TRACKING_FIELDS, "Tracking"),
                           (CLASSIFICATION_FIELDS, "Friend/Foe"),
@@ -125,8 +139,12 @@ def main() -> int:
                           (RECOIL_FIELDS, "Recoil"),
                           (MOTION_FIELDS, "Motion")):
         p = TuningPanel(handle, fields=fields, on_save=_save)
-        p.configChanged.connect(reloader.reload)
+        p.configChanged.connect(_on_config_changed)
+        tuning_panels.append(p)
         tabs.addTab(p, title)
+    profiles = ProfilesPanel(ProfileStore(_profiles_dir()), handle)
+    profiles.configChanged.connect(_on_config_changed)
+    tabs.addTab(profiles, "Profiles")
 
     worker = WorkerThread(loop)
     window = MainWindow(publisher, controls=tabs)
