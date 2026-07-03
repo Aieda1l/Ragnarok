@@ -80,7 +80,12 @@ class TuningPanel(QWidget):
         return w.value()
 
     def _commit(self, path: str) -> None:
-        new_cfg = apply_field(self._handle, path, self._read(path))
+        value = self._read(path)
+        # editingFinished fires on focus-out even without an edit; skip no-op
+        # commits so a mere focus change never swaps config or reloads the worker.
+        if value == get_field(self._handle.current, path):
+            return
+        new_cfg = apply_field(self._handle, path, value)
         self.configChanged.emit(new_cfg)
 
     def _save(self) -> None:
