@@ -33,3 +33,64 @@ def test_reload_disables_without_building_when_aim_off():
     r.reload(AppConfig())                           # aim.enabled defaults False
     assert loop.controller is None
     assert called["n"] == 0                          # no rebuild when disabled
+
+
+from ragnarok.gui.live_config import WorkerReloader
+
+
+class _FullLoop:
+    def __init__(self):
+        self.tracker = None
+        self.classifier = None
+    def set_tracker(self, t): self.tracker = t
+    def set_classifier(self, c): self.classifier = c
+
+
+class _RecordingAim:
+    def __init__(self): self.reloads = 0
+    def reload(self, cfg): self.reloads += 1
+
+
+def _make(initial):
+    loop = _FullLoop()
+    aim = _RecordingAim()
+    bt_calls, bc_calls = [], []
+    def bt(cfg, *, gmc_buffer=None): bt_calls.append(gmc_buffer); return "T"
+    def bc(cfg): bc_calls.append(cfg); return "C"
+    r = WorkerReloader(loop, aim_reloader=aim, build_tracker=bt, build_classifier=bc,
+                       commanded_buffer="BUF", initial_cfg=initial)
+    return r, loop, aim, bt_calls, bc_calls
+
+
+def test_first_reload_rebuilds_everything_when_no_initial():
+    r, loop, aim, bt, bc = _make(None)
+    r.reload(AppConfig())
+    assert aim.reloads == 1 and loop.tracker == "T" and loop.classifier == "C"
+    assert bt == [None]                                   # aim disabled -> no gmc buffer
+
+
+def test_only_changed_section_rebuilds():
+    base = AppConfig()
+    r, loop, aim, bt, bc = _make(base)
+    new = base.model_copy(update={"tracking": base.tracking.model_copy(update={"track_buffer": 45})})
+    r.reload(new)
+    assert loop.tracker == "T" and len(bt) == 1           # tracker rebuilt
+    assert aim.reloads == 0 and len(bc) == 0              # aim + classifier untouched
+
+
+def test_aim_slider_change_does_not_reset_tracker():
+    base = AppConfig()
+    r, loop, aim, bt, bc = _make(base)
+    new = base.model_copy(update={"aim": base.aim.model_copy(update={"kp": 0.9})})
+    r.reload(new)
+    assert aim.reloads == 1                                # aim rebuilt
+    assert len(bt) == 0 and len(bc) == 0                  # tracker/classifier untouched
+
+
+def test_enabling_aim_reattaches_gmc_buffer_to_tracker():
+    base = AppConfig()
+    r, loop, aim, bt, bc = _make(base)
+    new = base.model_copy(update={"aim": base.aim.model_copy(update={"enabled": True})})
+    r.reload(new)
+    assert aim.reloads == 1                                # aim slice changed
+    assert bt == ["BUF"]                                  # enabled -> gmc buffer fed

@@ -38,6 +38,27 @@ def test_choice_and_bool_commit(qtbot):
     assert h.current.aim.aimer == "hybrid"
 
 
+def test_commit_noop_does_not_emit_or_swap(qtbot):
+    # editingFinished fires on focus-out without an edit -> must not swap/reload.
+    h = ConfigHandle(AppConfig())
+    panel = TuningPanel(h)
+    qtbot.addWidget(panel)
+    before = h.current
+    with qtbot.assertNotEmitted(panel.configChanged):
+        panel._commit("aim.kp")                              # value unchanged
+    assert h.current is before
+
+
+def test_loaded_out_of_gui_range_value_is_not_clamped(qtbot):
+    # recoil.scale is schema-unbounded; a loaded 8.0 must display as 8.0, not clamp.
+    from ragnarok.gui.tuning_model import RECOIL_FIELDS
+    cfg = AppConfig().model_copy(
+        update={"recoil": AppConfig().recoil.model_copy(update={"scale": 8.0})})
+    panel = TuningPanel(ConfigHandle(cfg), fields=RECOIL_FIELDS)
+    qtbot.addWidget(panel)
+    assert panel.widget_for("recoil.scale").value() == 8.0
+
+
 def test_save_button_invokes_callback(qtbot):
     h = ConfigHandle(AppConfig())
     saved = {}
