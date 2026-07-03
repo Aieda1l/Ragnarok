@@ -59,6 +59,19 @@ def test_loaded_out_of_gui_range_value_is_not_clamped(qtbot):
     assert panel.widget_for("recoil.scale").value() == 8.0
 
 
+def test_out_of_gui_range_value_not_clamped_on_build_or_refresh(qtbot):
+    # aim.ki is schema-unbounded above (GUI cap 5.0); a config with ki=8.0 must
+    # display 8.0 (range auto-expanded), both at construction and after refresh.
+    over = AppConfig().model_copy(update={"aim": AppConfig().aim.model_copy(update={"ki": 8.0})})
+    h = ConfigHandle(over)
+    panel = TuningPanel(h)
+    qtbot.addWidget(panel)
+    assert panel.widget_for("aim.ki").value() == 8.0            # not clamped to 5.0 on build
+    h.swap(AppConfig().model_copy(update={"aim": AppConfig().aim.model_copy(update={"ki": 12.0})}))
+    panel.refresh()
+    assert panel.widget_for("aim.ki").value() == 12.0           # not clamped on refresh
+
+
 def test_refresh_repaints_widgets_without_recommitting(qtbot):
     h = ConfigHandle(AppConfig())
     panel = TuningPanel(h)
