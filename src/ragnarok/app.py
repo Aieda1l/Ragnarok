@@ -19,6 +19,7 @@ from ragnarok.gui.tuning_model import (
     MOTION_FIELDS, INPUT_FIELDS)
 from ragnarok.gui.diagnostics_panel import DiagnosticsPanel
 from ragnarok.gui.profiles_panel import ProfilesPanel
+from ragnarok.gui.calibration_panel import CalibrationPanel
 from ragnarok.gui.live_config import AimReloader, WorkerReloader
 from ragnarok.config.profiles import ProfileStore
 
@@ -166,6 +167,9 @@ def main() -> int:
     profiles = ProfilesPanel(ProfileStore(_profiles_dir()), handle)
     profiles.configChanged.connect(_on_config_changed)
     tabs.addTab(profiles, "Profiles")
+    wizards = CalibrationPanel(handle)
+    wizards.configChanged.connect(_on_config_changed)
+    tabs.addTab(wizards, "Wizards")
 
     worker = WorkerThread(loop)
     window = MainWindow(publisher, controls=tabs)
