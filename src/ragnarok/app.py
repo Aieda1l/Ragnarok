@@ -21,6 +21,7 @@ from ragnarok.gui.diagnostics_panel import DiagnosticsPanel
 from ragnarok.gui.profiles_panel import ProfilesPanel
 from ragnarok.gui.calibration_panel import CalibrationPanel
 from ragnarok.gui.dashboard_panel import DashboardPanel
+from ragnarok.gui.chrome_frame import ChromeFrame
 from ragnarok.gui.live_config import AimReloader, WorkerReloader
 from ragnarok.config.profiles import ProfileStore
 
@@ -177,7 +178,7 @@ def main() -> int:
     tabs.addTab(wizards, "Wizards")
 
     worker = WorkerThread(loop)
-    window = MainWindow(publisher, controls=tabs)
+    window = MainWindow(publisher, controls=ChromeFrame(tabs))   # Cyberpunk panel chrome
     window.show()
     # Smart-lock FOV overlay: frameless/click-through, own timer, read-only.
     # Reads the LIVE config so FOV-ring / aim-point edits show immediately.

@@ -18,10 +18,10 @@ def test_team_color_maps_all_teams_distinctly():
     assert theme.team_color(Team.ENEMY) != theme.team_color(Team.TEAMMATE)
 
 
-def test_stylesheet_is_wellformed_and_uses_the_accent():
+def test_stylesheet_is_wellformed_and_uses_red_cyan():
     qss = theme.build_stylesheet()
     assert isinstance(qss, str) and len(qss) > 200
-    assert theme.ELECTRIC_YELLOW in qss and theme.NEAR_BLACK in qss
+    assert theme.RED in qss and theme.CYAN in qss and theme.BG in qss
     assert qss.count("{") == qss.count("}")               # balanced braces
     assert "QTabBar::tab" in qss and "QPushButton" in qss and "QLabel#mono" in qss
 
@@ -37,4 +37,4 @@ def test_apply_theme_sets_stylesheet_without_a_real_qapp():
         def setStyleSheet(self, s): self.qss = s
     app = _App()
     theme.apply_theme(app, font_dir="/nonexistent")       # absent dir -> no Qt font import
-    assert app.qss and theme.ELECTRIC_YELLOW in app.qss
+    assert app.qss and theme.RED in app.qss
