@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
 )
 
 from ragnarok.gui.tuning_model import AIM_FIELDS, apply_field, get_field
+from ragnarok.gui.segmented_toggle import SegmentedToggle
 
 
 class TuningPanel(QWidget):
@@ -53,7 +54,7 @@ class TuningPanel(QWidget):
             value = get_field(cfg, path)
             w.blockSignals(True)
             try:
-                if isinstance(w, QCheckBox):
+                if isinstance(w, (QCheckBox, SegmentedToggle)):
                     w.setChecked(bool(value))
                 elif isinstance(w, QComboBox):
                     w.setCurrentText(str(value))
@@ -81,8 +82,7 @@ class TuningPanel(QWidget):
     def _build_widget(self, spec, value) -> QWidget:
         path = spec.path
         if spec.kind == "bool":
-            w = QCheckBox()
-            w.setChecked(bool(value))
+            w = SegmentedToggle(bool(value))       # CP2077 OFF/ON toggle
             w.stateChanged.connect(lambda _s, p=path: self._commit(p))
             return w
         if spec.kind == "choice":
@@ -113,7 +113,7 @@ class TuningPanel(QWidget):
     # -- commit ----------------------------------------------------------
     def _read(self, path: str):
         w = self._widgets[path]
-        if isinstance(w, QCheckBox):
+        if isinstance(w, (QCheckBox, SegmentedToggle)):
             return w.isChecked()
         if isinstance(w, QComboBox):
             return w.currentText()
