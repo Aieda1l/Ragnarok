@@ -1,5 +1,5 @@
 import math
-from ragnarok.gui.overlay_model import ScreenMap, FovRing, OverlayScene
+from ragnarok.gui.overlay_model import ScreenMap, FovBox, OverlayScene
 
 
 def test_screenmap_from_region_maps_points_and_rect():
@@ -19,16 +19,16 @@ def test_screenmap_scales_when_region_larger_than_roi():
 def test_empty_scene_has_no_signal():
     s = OverlayScene.empty()
     assert s.has_signal is False and s.fov is None and s.markers == ()
+    assert s.fov_thin == () and s.fov_thick == ()
 
 
-def test_fovring_fields():
-    r = FovRing(center=(5.0, 6.0), acquire_radius=10.0, retain_radius=20.0)
-    assert r.center == (5.0, 6.0) and r.acquire_radius < r.retain_radius
-    assert r.tick_count == 12
+def test_fovbox_fields():
+    b = FovBox(center=(960.0, 540.0), half=40.0)
+    assert b.center == (960.0, 540.0) and b.half == 40.0
 
 
 from ragnarok.core.types import Track, Team
-from ragnarok.gui.overlay_model import build_markers, LockAgeTracker
+from ragnarok.gui.overlay_model import build_markers, fov_bracket_segments
 
 
 def _trk(tid, xyxy, team=Team.ENEMY, conf=0.9):
@@ -52,40 +52,23 @@ def test_build_markers_sets_lock_diamond_and_fov():
     assert by_id[1].box == (180.0, 150.0, 204.0, 234.0)
 
 
-def test_lock_age_tracker_resets_on_change():
-    t = LockAgeTracker()
-    assert t.update(None, 0) == 0.0
-    assert t.update(5, 1_000_000_000) == 0.0        # first frame of a new lock -> age 0
-    assert t.update(5, 1_500_000_000) == 0.5        # 0.5 s later
-    assert t.update(6, 1_600_000_000) == 0.0        # switched lock -> reset
-    assert t.update(None, 2_000_000_000) == 0.0     # lock dropped -> 0
-
-
-from ragnarok.gui.overlay_model import (
-    lock_progress, bracket_segments, _ray_rect_edge, _in_viewport)
-
-
-def test_lock_progress_clamps():
-    assert lock_progress(-1.0, 0.2) == 0.0
-    assert lock_progress(0.1, 0.2) == 0.5
-    assert lock_progress(5.0, 0.2) == 1.0
-    assert lock_progress(0.0, 0.0) == 1.0            # zero-duration -> snapped
-
-
-def test_bracket_segments_converge():
-    box = (100.0, 100.0, 200.0, 200.0)
-    # t=1: top-left corner arm starts exactly at (100,100)
-    snapped = bracket_segments(box, t=1.0, gap=20.0, arm_len=10.0)
-    tl_h = snapped[0]                                # first corner, horizontal arm
-    assert tl_h[0] == (100.0, 100.0)
-    assert tl_h[1] == (110.0, 100.0)                 # arm extends inward +x
-    # t=0: same corner is offset gap px up-and-left (unconverged/wide)
-    wide = bracket_segments(box, t=0.0, gap=20.0, arm_len=10.0)
-    assert wide[0][0] == (80.0, 80.0)
-    assert len(snapped) == 8                          # 4 corners x 2 arms
+def test_fov_bracket_segments_two_verticals_and_four_diagonal_arms():
+    thin, thick = fov_bracket_segments((100.0, 100.0), half=40.0, arm=10.0)
+    # two thin verticals at x = 60 and x = 140, spanning the full square height
+    assert thin == (((60.0, 60.0), (60.0, 140.0)),
+                    ((140.0, 60.0), (140.0, 140.0)))
+    # four bold arms, each a true 45° diagonal (|dx| == |dy| == arm) angling inward
+    assert len(thick) == 4
+    for (ax, ay), (bx, by) in thick:
+        assert abs(bx - ax) == 10.0 and abs(by - ay) == 10.0        # 45°, length arm
+    # left-top arm starts at the top-left corner, heads down-and-right (inward)
+    assert thick[0] == ((60.0, 60.0), (70.0, 70.0))
+    # right-bottom arm starts at bottom-right, heads up-and-left (inward)
+    assert thick[3] == ((140.0, 140.0), (130.0, 130.0))
 
 
 def test_ray_rect_edge_and_in_viewport():
+    from ragnarok.gui.overlay_model import _ray_rect_edge, _in_viewport
     vp = (0.0, 0.0, 100.0, 100.0)
     assert _in_viewport((50.0, 50.0), vp) is True
     assert _in_viewport((150.0, 50.0), vp) is False
@@ -111,24 +94,32 @@ def _snap(**kw):
 
 def test_build_scene_no_region_is_empty():
     scene = build_scene(snapshot=_snap(roi_region=None), cfg=AppConfig(),
-                        viewport=(0.0, 0.0, 1920.0, 1080.0), lock_age_s=0.0)
+                        viewport=(0.0, 0.0, 1920.0, 1080.0))
     assert scene.has_signal is False
 
 
-def test_build_scene_locked_target_gets_brackets_and_line():
+def test_build_scene_has_square_fov_brackets_and_locked_line():
     cfg = AppConfig()                                   # roi 384, hfov 90, screen 1920
     # ROI centred on screen: region (768,348)-(1152,732); crosshair -> (960,540)
     tracks = (_trk(3, (180, 150, 204, 234)),)           # enemy near crosshair
     snap = _snap(roi_region=(768, 348, 1152, 732), tracks=tracks, locked_target_id=3)
-    scene = build_scene(snapshot=snap, cfg=cfg,
-                        viewport=(0.0, 0.0, 1920.0, 1080.0), lock_age_s=1.0)
+    scene = build_scene(snapshot=snap, cfg=cfg, viewport=(0.0, 0.0, 1920.0, 1080.0))
     assert scene.has_signal is True
     assert scene.crosshair == (960.0, 540.0)
-    assert scene.fov is not None and scene.fov.acquire_radius < scene.fov.retain_radius
-    assert len(scene.bracket_segments) == 8             # locked target -> brackets
+    assert isinstance(scene.fov, FovBox) and scene.fov.center == (960.0, 540.0)
+    assert scene.fov.half > 0.0
+    assert len(scene.fov_thin) == 2 and len(scene.fov_thick) == 4   # two brackets
     assert scene.locked_line is not None
-    assert scene.locked_line[0] == scene.crosshair
+    assert scene.locked_line[0] == scene.crosshair                  # from crosshair
     assert len(scene.markers) == 1
+
+
+def test_build_scene_no_lock_has_no_line():
+    cfg = AppConfig()
+    tracks = (_trk(3, (180, 150, 204, 234)),)
+    snap = _snap(roi_region=(768, 348, 1152, 732), tracks=tracks, locked_target_id=None)
+    scene = build_scene(snapshot=snap, cfg=cfg, viewport=(0.0, 0.0, 1920.0, 1080.0))
+    assert scene.locked_line is None and len(scene.fov_thick) == 4
 
 
 def test_build_scene_offscreen_enemy_becomes_hint():
@@ -136,7 +127,6 @@ def test_build_scene_offscreen_enemy_becomes_hint():
     # enemy far outside the ROI mapping -> diamond outside a tiny viewport
     tracks = (_trk(9, (380, 380, 384, 384)),)
     snap = _snap(roi_region=(768, 348, 1152, 732), tracks=tracks, locked_target_id=None)
-    scene = build_scene(snapshot=snap, cfg=cfg,
-                        viewport=(0.0, 0.0, 1000.0, 700.0), lock_age_s=0.0)
+    scene = build_scene(snapshot=snap, cfg=cfg, viewport=(0.0, 0.0, 1000.0, 700.0))
     assert len(scene.offscreen) == 1
     assert scene.offscreen[0].team == Team.ENEMY
