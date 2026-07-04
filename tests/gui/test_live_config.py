@@ -94,3 +94,12 @@ def test_enabling_aim_reattaches_gmc_buffer_to_tracker():
     r.reload(new)
     assert aim.reloads == 1                                # aim slice changed
     assert bt == ["BUF"]                                  # enabled -> gmc buffer fed
+
+
+def test_driver_change_rebuilds_aim_controller():
+    base = AppConfig()
+    r, loop, aim, bt, bc = _make(base)
+    new = base.model_copy(update={"input": base.input.model_copy(update={"mouse_driver": "arduino"})})
+    r.reload(new)
+    assert aim.reloads == 1                                # input change -> aim rebuild
+    assert len(bt) == 0 and len(bc) == 0                  # tracker/classifier untouched

@@ -9,13 +9,14 @@ from ragnarok.detection.factory import create_detector
 from ragnarok.latency.profiler import StageProfiler
 from ragnarok.telemetry.snapshot import SnapshotPublisher
 from ragnarok.worker.loop import WorkerLoop
-from ragnarok.wiring import build_tracker, build_classifier
+from ragnarok.wiring import build_tracker, build_classifier, build_mouse_driver
 from ragnarok.gui.worker_thread import WorkerThread
 from ragnarok.gui.main_window import MainWindow
 from ragnarok.gui.overlay_window import FovOverlay
 from ragnarok.gui.tuning_panel import TuningPanel
 from ragnarok.gui.tuning_model import (
-    TRACKING_FIELDS, CLASSIFICATION_FIELDS, TRIGGER_FIELDS, RECOIL_FIELDS, MOTION_FIELDS)
+    TRACKING_FIELDS, CLASSIFICATION_FIELDS, TRIGGER_FIELDS, RECOIL_FIELDS,
+    MOTION_FIELDS, INPUT_FIELDS)
 from ragnarok.gui.diagnostics_panel import DiagnosticsPanel
 from ragnarok.gui.profiles_panel import ProfilesPanel
 from ragnarok.gui.live_config import AimReloader, WorkerReloader
@@ -52,8 +53,18 @@ def _build_aim_controller(cfg, commanded_buffer):
     selector = TargetSelector(fov_px=fov_px, retain_fov_px=retain_px,
                               dwell_ms=a.dwell_ms, switch_margin=a.switch_margin,
                               head_frac=a.head_frac)
-    mouse = SendInputMouseDriver()
-    mouse.connect()
+    def _sendinput():
+        m = SendInputMouseDriver()
+        m.connect()
+        return m
+
+    def _arduino(c):
+        from ragnarok.aim.arduino import ArduinoDriver, build_arduino_transport
+        d = ArduinoDriver(transport=build_arduino_transport(c))
+        d.connect()
+        return d
+
+    mouse = build_mouse_driver(cfg, sendinput_factory=_sendinput, arduino_factory=_arduino)
     is_active = make_aim_active(AsyncKeyStateProvider(a.aim_key), toggle=a.toggle)
 
     trigger = None
@@ -137,7 +148,8 @@ def main() -> int:
                           (CLASSIFICATION_FIELDS, "Friend/Foe"),
                           (TRIGGER_FIELDS, "Trigger"),
                           (RECOIL_FIELDS, "Recoil"),
-                          (MOTION_FIELDS, "Motion")):
+                          (MOTION_FIELDS, "Motion"),
+                          (INPUT_FIELDS, "Input")):
         p = TuningPanel(handle, fields=fields, on_save=_save)
         p.configChanged.connect(_on_config_changed)
         tuning_panels.append(p)
