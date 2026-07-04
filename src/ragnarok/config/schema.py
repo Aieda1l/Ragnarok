@@ -151,6 +151,11 @@ class ArduinoConfig(BaseModel):
     udp_port: int = Field(default=0, ge=0, le=65535)
 
 
+class InputConfig(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    mouse_driver: Literal["sendinput", "arduino"] = "sendinput"
+
+
 class DynamicRoiConfig(BaseModel):
     model_config = ConfigDict(frozen=True)
     enabled: bool = False
@@ -173,4 +178,5 @@ class AppConfig(BaseModel):
     diagnostics: DiagnosticsConfig = DiagnosticsConfig()
     training: TrainingConfig = TrainingConfig()
     arduino: ArduinoConfig = ArduinoConfig()
+    input: InputConfig = InputConfig()
     dynamic_roi: DynamicRoiConfig = DynamicRoiConfig()
