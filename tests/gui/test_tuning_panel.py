@@ -87,6 +87,24 @@ def test_refresh_repaints_widgets_without_recommitting(qtbot):
     assert panel.widget_for("aim.aimer").currentText() == "hybrid"
 
 
+def test_text_field_edits_and_refreshes(qtbot):
+    from PySide6.QtWidgets import QLineEdit
+    from ragnarok.gui.tuning_model import FieldSpec
+    h = ConfigHandle(AppConfig())
+    panel = TuningPanel(h, fields=(FieldSpec("arduino.port", "Port", "text"),))
+    qtbot.addWidget(panel)
+    w = panel.widget_for("arduino.port")
+    assert isinstance(w, QLineEdit) and w.text() == ""
+    w.setText("COM3")
+    panel._commit("arduino.port")
+    assert h.current.arduino.port == "COM3"
+    # refresh from a swapped config, signal-blocked (no re-commit)
+    h.swap(AppConfig().model_copy(update={"arduino": AppConfig().arduino.model_copy(update={"port": "COM7"})}))
+    with qtbot.assertNotEmitted(panel.configChanged):
+        panel.refresh()
+    assert panel.widget_for("arduino.port").text() == "COM7"
+
+
 def test_save_button_invokes_callback(qtbot):
     h = ConfigHandle(AppConfig())
     saved = {}

@@ -9,8 +9,8 @@ from __future__ import annotations
 
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
-    QCheckBox, QComboBox, QDoubleSpinBox, QFormLayout, QPushButton, QVBoxLayout,
-    QWidget,
+    QCheckBox, QComboBox, QDoubleSpinBox, QFormLayout, QLineEdit, QPushButton,
+    QVBoxLayout, QWidget,
 )
 
 from ragnarok.gui.tuning_model import AIM_FIELDS, apply_field, get_field
@@ -57,6 +57,8 @@ class TuningPanel(QWidget):
                     w.setChecked(bool(value))
                 elif isinstance(w, QComboBox):
                     w.setCurrentText(str(value))
+                elif isinstance(w, QLineEdit):
+                    w.setText("" if value is None else str(value))
                 else:
                     self._fit_range(w, value)
                     w.setValue(float(value))
@@ -89,6 +91,11 @@ class TuningPanel(QWidget):
             w.setCurrentText(str(value))
             w.currentIndexChanged.connect(lambda _i, p=path: self._commit(p))
             return w
+        if spec.kind == "text":
+            w = QLineEdit()
+            w.setText("" if value is None else str(value))
+            w.editingFinished.connect(lambda p=path: self._commit(p))
+            return w
         # float / int -> spin box
         w = QDoubleSpinBox()
         w.setDecimals(0 if spec.kind == "int" else 3)
@@ -110,6 +117,8 @@ class TuningPanel(QWidget):
             return w.isChecked()
         if isinstance(w, QComboBox):
             return w.currentText()
+        if isinstance(w, QLineEdit):
+            return w.text()
         return w.value()
 
     def _commit(self, path: str) -> None:
