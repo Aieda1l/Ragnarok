@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
 
 from ragnarok.gui.tuning_model import AIM_FIELDS, apply_field, get_field
 from ragnarok.gui.segmented_toggle import SegmentedToggle
+from ragnarok.gui.cyber_slider import CyberSlider
 
 
 class TuningPanel(QWidget):
@@ -96,9 +97,12 @@ class TuningPanel(QWidget):
             w.setText("" if value is None else str(value))
             w.editingFinished.connect(lambda p=path: self._commit(p))
             return w
-        # float / int -> spin box
-        w = QDoubleSpinBox()
-        w.setDecimals(0 if spec.kind == "int" else 3)
+        # float -> CP2077 slider (bounded, drag-adjust); int -> precise spin box
+        if spec.kind == "float":
+            w = CyberSlider()
+        else:
+            w = QDoubleSpinBox()
+            w.setDecimals(0)
         if spec.minimum is not None:
             w.setMinimum(spec.minimum)
         if spec.maximum is not None:
