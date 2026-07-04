@@ -32,3 +32,32 @@ class TelemetryHistory:
 
     def __len__(self) -> int:
         return len(self._series["fps"])
+
+
+def sparkline_points(values, *, x0: float, y0: float, w: float, h: float,
+                     y_min: float | None = None, y_max: float | None = None):
+    """Map ``values`` to polyline points inside the rect (x0,y0,w,h).
+
+    Higher value -> higher on screen (smaller y). Empty -> (); single point ->
+    mid-height; a flat series (or zero span) -> the mid-line.
+    """
+    vals = [float(v) for v in values]
+    n = len(vals)
+    if n == 0:
+        return ()
+    mid = y0 + h / 2.0
+    if n == 1:
+        return ((float(x0), mid),)
+    lo = min(vals) if y_min is None else y_min
+    hi = max(vals) if y_max is None else y_max
+    span = hi - lo
+    pts = []
+    for i, v in enumerate(vals):
+        x = x0 + (i / (n - 1)) * w
+        if span <= 0.0:
+            y = mid
+        else:
+            frac = (v - lo) / span
+            y = y0 + (1.0 - frac) * h          # invert: bigger value -> smaller y
+        pts.append((float(x), float(y)))
+    return tuple(pts)
