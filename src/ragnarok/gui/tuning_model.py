@@ -18,7 +18,7 @@ from ragnarok.config.store import ConfigHandle
 class FieldSpec:
     path: str                     # "section.field"
     label: str
-    kind: str                     # "float" | "int" | "bool" | "choice"
+    kind: str                     # "float" | "int" | "bool" | "choice" | "text"
     minimum: float | None = None
     maximum: float | None = None
     step: float | None = None
