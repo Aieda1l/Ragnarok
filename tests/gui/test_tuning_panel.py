@@ -1,4 +1,5 @@
-from PySide6.QtWidgets import QDoubleSpinBox, QCheckBox, QComboBox
+from PySide6.QtWidgets import QDoubleSpinBox, QComboBox
+from ragnarok.gui.segmented_toggle import SegmentedToggle
 from ragnarok.config.schema import AppConfig
 from ragnarok.config.store import ConfigHandle
 from ragnarok.gui.tuning_panel import TuningPanel
@@ -9,7 +10,7 @@ def test_panel_builds_a_widget_per_field(qtbot):
     panel = TuningPanel(h)
     qtbot.addWidget(panel)
     assert isinstance(panel.widget_for("aim.kp"), QDoubleSpinBox)
-    assert isinstance(panel.widget_for("aim.enabled"), QCheckBox)
+    assert isinstance(panel.widget_for("aim.enabled"), SegmentedToggle)
     assert isinstance(panel.widget_for("aim.aimer"), QComboBox)
     # initialised from the handle's current config
     assert panel.widget_for("aim.kp").value() == AppConfig().aim.kp

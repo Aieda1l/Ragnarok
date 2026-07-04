@@ -1,35 +1,33 @@
 """Cyberpunk 2077 theme: palette tokens, bundled-font loading, and the app-wide
 QSS stylesheet (spec §10.1).
 
-The palette tokens and ``build_stylesheet`` are pure (no Qt import) so they stay
-unit-testable. ``load_fonts``/``apply_theme`` touch Qt and import it lazily.
-
-Aesthetic: near-black backgrounds, signature electric-yellow (#FCEE0A) primary
-accent, cyan/teal + alert-red secondaries, angular (zero-radius) panels, thin
-borders, condensed techy type (Rajdhani/Saira/Chakra Petch if bundled), and
-monospaced numerals for telemetry. Corner-bracket chrome, scanlines and glitch
-transitions are a later custom-paint pass; this establishes the base skin.
+Palette follows the CP2077 *settings menu*: a dark red-tinted background with
+salmon-red labels/borders and cyan values/active states (the electric yellow is
+kept only for the HUD/overlay accents). The palette tokens and
+``build_stylesheet`` are pure (no Qt import) so they stay unit-testable;
+``load_fonts``/``apply_theme`` touch Qt and import it lazily.
 """
 from __future__ import annotations
 
 from ragnarok.core.types import Team
 
-# --- signature accents (spec §10.1) ---------------------------------------
-ELECTRIC_YELLOW = "#FCEE0A"   # primary accent (FOV ring, brackets, lock line, focus)
-CYAN = "#00F0FF"              # secondary (hover / p50)
-ALERT_RED = "#FF3B3B"         # locked-target highlight / alerts / p99
-NEAR_BLACK = "#0A0A0C"        # base background
+# --- signature accents ----------------------------------------------------
+RED = "#F0413C"               # primary GUI accent (labels, borders, OFF toggle)
+CYAN = "#38E0F0"              # secondary (values, active/ON, hover, selected tab)
+ELECTRIC_YELLOW = "#FCEE0A"   # HUD/overlay accent (dashboard FPS trace)
+ALERT_RED = "#FF3B3B"         # overlay target diamonds / p99 trace
+NEAR_BLACK = "#0A0A0C"
 
-# --- surfaces & text ------------------------------------------------------
-BG = NEAR_BLACK
-PANEL = "#111218"             # panels / buttons / tabs
-PANEL_ALT = "#16171F"         # inputs
-BORDER = "#2A2C38"            # thin dividers / idle input borders
-TEXT = "#D8DAE0"
-TEXT_DIM = "#7A7C88"
+# --- surfaces & text (dark, subtly red-tinted like the CP2077 menus) ------
+BG = "#100608"
+PANEL = "#1C0C0E"             # panels / buttons / tabs
+PANEL_ALT = "#281114"        # inputs
+BORDER = "#6A2E30"           # dark-red dividers / idle input borders
+TEXT = "#E6D2D2"             # warm light body text
+TEXT_DIM = "#8A6668"
+LABEL = "#E8908C"            # salmon-red field labels
 
 # --- typography -----------------------------------------------------------
-# Condensed techy stack with graceful fallback when the faces aren't bundled.
 FONT_STACK = '"Rajdhani","Saira Condensed","Chakra Petch","Segoe UI",sans-serif'
 MONO_STACK = '"Chakra Petch","JetBrains Mono","Consolas",monospace'
 
@@ -46,10 +44,9 @@ def team_color(team: Team) -> str:
 
 
 def build_stylesheet() -> str:
-    """The app-wide Cyberpunk QSS. Pure string builder (no Qt) so it is testable.
-
-    Labels/telemetry with ``objectName == "mono"`` render in the monospaced
-    numeral stack (spec §10.1)."""
+    """The app-wide CP2077 QSS (red labels/borders, cyan values/active). Pure
+    string builder (no Qt) so it is testable. Labels/telemetry with
+    ``objectName == "mono"`` render in the cyan monospaced numeral stack."""
     return f"""
     QWidget {{
         background: {BG};
@@ -58,14 +55,14 @@ def build_stylesheet() -> str:
         font-size: 13px;
     }}
     QMainWindow, QDialog {{ background: {BG}; }}
-    QLabel {{ background: transparent; }}
-    QLabel#mono {{ font-family: {MONO_STACK}; color: {ELECTRIC_YELLOW}; }}
+    QLabel {{ background: transparent; color: {LABEL}; }}
+    QLabel#mono {{ font-family: {MONO_STACK}; color: {CYAN}; }}
 
-    /* Tabs — angular, yellow-underlined selection */
+    /* Tabs — inactive red, active cyan with a cyan top edge */
     QTabWidget::pane {{ border: 1px solid {BORDER}; top: -1px; }}
     QTabBar::tab {{
         background: {PANEL};
-        color: {TEXT_DIM};
+        color: {RED};
         padding: 6px 14px;
         border: 1px solid {BORDER};
         border-bottom: none;
@@ -73,61 +70,61 @@ def build_stylesheet() -> str:
     }}
     QTabBar::tab:selected {{
         background: {BG};
-        color: {ELECTRIC_YELLOW};
-        border-top: 2px solid {ELECTRIC_YELLOW};
+        color: {CYAN};
+        border-top: 2px solid {CYAN};
     }}
     QTabBar::tab:hover {{ color: {CYAN}; }}
 
-    /* Buttons — CP2077 fill-on-hover */
+    /* Buttons — red border, fill-on-hover */
     QPushButton {{
         background: {PANEL};
-        color: {ELECTRIC_YELLOW};
-        border: 1px solid {ELECTRIC_YELLOW};
+        color: {RED};
+        border: 1px solid {RED};
         border-radius: 0px;
         padding: 6px 14px;
     }}
-    QPushButton:hover {{ background: {ELECTRIC_YELLOW}; color: {BG}; }}
+    QPushButton:hover {{ background: {RED}; color: {BG}; }}
     QPushButton:pressed {{ background: {CYAN}; color: {BG}; border-color: {CYAN}; }}
     QPushButton:disabled {{ color: {TEXT_DIM}; border-color: {BORDER}; }}
 
-    /* Inputs — dark, yellow focus */
+    /* Inputs — dark, cyan value text, red border -> cyan on focus */
     QLineEdit, QDoubleSpinBox, QSpinBox, QComboBox {{
         background: {PANEL_ALT};
-        color: {TEXT};
+        color: {CYAN};
         border: 1px solid {BORDER};
         border-radius: 0px;
         padding: 3px 6px;
-        selection-background-color: {ELECTRIC_YELLOW};
+        selection-background-color: {CYAN};
         selection-color: {BG};
     }}
     QLineEdit:focus, QDoubleSpinBox:focus, QSpinBox:focus, QComboBox:focus {{
-        border: 1px solid {ELECTRIC_YELLOW};
+        border: 1px solid {CYAN};
     }}
     QComboBox::drop-down {{ border: none; width: 16px; }}
     QComboBox QAbstractItemView {{
         background: {PANEL};
         color: {TEXT};
-        border: 1px solid {ELECTRIC_YELLOW};
-        selection-background-color: {ELECTRIC_YELLOW};
+        border: 1px solid {RED};
+        selection-background-color: {RED};
         selection-color: {BG};
     }}
 
-    /* Check boxes */
-    QCheckBox {{ spacing: 6px; }}
+    /* Check boxes (fallback; bool fields use the segmented toggle) */
+    QCheckBox {{ spacing: 6px; color: {LABEL}; }}
     QCheckBox::indicator {{
         width: 14px; height: 14px;
         border: 1px solid {BORDER}; background: {PANEL_ALT};
     }}
-    QCheckBox::indicator:checked {{ background: {ELECTRIC_YELLOW}; border: 1px solid {ELECTRIC_YELLOW}; }}
-    QCheckBox::indicator:hover {{ border: 1px solid {CYAN}; }}
+    QCheckBox::indicator:checked {{ background: {CYAN}; border: 1px solid {CYAN}; }}
+    QCheckBox::indicator:hover {{ border: 1px solid {RED}; }}
 
-    /* Scroll bars — thin, yellow on hover */
+    /* Scroll bars — thin, red on hover */
     QScrollBar:vertical {{ background: {BG}; width: 10px; margin: 0; }}
     QScrollBar::handle:vertical {{ background: {BORDER}; min-height: 24px; }}
-    QScrollBar::handle:vertical:hover {{ background: {ELECTRIC_YELLOW}; }}
+    QScrollBar::handle:vertical:hover {{ background: {RED}; }}
     QScrollBar:horizontal {{ background: {BG}; height: 10px; margin: 0; }}
     QScrollBar::handle:horizontal {{ background: {BORDER}; min-width: 24px; }}
-    QScrollBar::handle:horizontal:hover {{ background: {ELECTRIC_YELLOW}; }}
+    QScrollBar::handle:horizontal:hover {{ background: {RED}; }}
     QScrollBar::add-line, QScrollBar::sub-line {{ height: 0; width: 0; }}
     """
 
