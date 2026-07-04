@@ -134,7 +134,16 @@ def main() -> int:
         # any panel edit / profile load: repaint the other tabs, then hot-reload
         for tp in tuning_panels:
             tp.refresh()
-        reloader.reload(new_cfg)
+        # A rebuild can raise on invalid config (e.g. arduino driver with an
+        # empty port -> build_arduino_transport raises at BUILD time). Never let
+        # that escape into the Qt event loop (PySide6 aborts on an unhandled slot
+        # exception). WorkerReloader leaves _prev stale on failure, so once the
+        # user supplies a valid value the next edit rebuilds cleanly.
+        try:
+            reloader.reload(new_cfg)
+        except Exception as exc:  # noqa: BLE001 — GUI must stay alive
+            import warnings
+            warnings.warn(f"config reload failed (keeping previous worker components): {exc}")
 
     tabs = QTabWidget()
     aim_panel = TuningPanel(handle, on_save=_save)
