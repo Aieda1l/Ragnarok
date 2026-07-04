@@ -94,3 +94,11 @@ def build_recoil(cfg: AppConfig):
         return None
     from ragnarok.recoil.compensator import RecoilPattern, RecoilCompensator
     return RecoilCompensator(RecoilPattern(points=r.pattern), scale=r.scale)
+
+
+def build_mouse_driver(cfg, *, sendinput_factory, arduino_factory):
+    """Select the mouse driver from config. Selection-only + import-light: the
+    real SendInput/Arduino builds live in the injected factories (box-only)."""
+    if cfg.input.mouse_driver == "arduino":
+        return arduino_factory(cfg)
+    return sendinput_factory()
