@@ -27,10 +27,11 @@ class CalibrationPanel(QWidget):
         root.addWidget(QLabel(
             "Sensitivity / GMC calibration: do a known in-game turn against a\n"
             "static reference, then enter the mouse counts moved and the degrees\n"
-            "the view rotated (negative if inverted)."))
+            "the view rotated. Use the SAME sign convention for BOTH (e.g.\n"
+            "rightward = positive) so the GMC direction comes out correct."))
         form = QFormLayout()
         for key, label, lo, hi, step, default in (
-            ("counts", "Mouse counts moved", -1e7, 1e7, 10.0, 1000.0),
+            ("counts", "Mouse counts moved (signed)", -1e7, 1e7, 10.0, 1000.0),
             ("degrees", "Degrees rotated (signed)", -3600.0, 3600.0, 1.0, 360.0),
         ):
             w = QDoubleSpinBox()
@@ -58,7 +59,11 @@ class CalibrationPanel(QWidget):
         try:
             new_cfg = apply_sensitivity(self._handle, total_counts=counts,
                                         measured_deg=degrees)
-        except Exception as exc:  # noqa: BLE001 — bad input (zero counts / zero turn)
+        except ValueError as exc:
+            # Only the EXPECTED bad-input failures: solve_deg_per_count's
+            # ValueError (zero counts) and pydantic ValidationError (zero turn ->
+            # sensitivity gt=0), which subclasses ValueError. A genuine wiring bug
+            # (Type/Attribute/KeyError) propagates instead of being mislabeled.
             self.result_label.setText(f"invalid calibration: {exc}")
             return
         self.result_label.setText(
