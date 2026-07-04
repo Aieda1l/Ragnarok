@@ -29,3 +29,18 @@ def test_solve_zero_counts_is_safe_noop(qtbot):
         panel._solve()
     assert h.current is before                       # nothing applied
     assert "invalid" in panel.result_label.text().lower() or "—" in panel.result_label.text()
+
+
+def test_solve_propagates_non_value_error(qtbot):
+    # a genuine wiring bug (not bad input) must surface, not be mislabeled
+    import pytest
+    class _BadHandle:
+        @property
+        def current(self):
+            raise TypeError("wiring bug")
+    panel = CalibrationPanel(_BadHandle())
+    qtbot.addWidget(panel)
+    panel.widget_for("counts").setValue(1000.0)
+    panel.widget_for("degrees").setValue(22.0)
+    with pytest.raises(TypeError):
+        panel._solve()
