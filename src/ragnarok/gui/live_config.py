@@ -44,9 +44,11 @@ class WorkerReloader:
 
     def reload(self, cfg) -> None:
         prev = self._prev
-        # aim controller depends on aim + trigger + recoil + motion
-        if prev is None or (cfg.aim, cfg.trigger, cfg.recoil, cfg.motion) != (
-                prev.aim, prev.trigger, prev.recoil, prev.motion):
+        # aim controller depends on aim + trigger + recoil + motion + input driver + arduino
+        if prev is None or (cfg.aim, cfg.trigger, cfg.recoil, cfg.motion,
+                            cfg.input, cfg.arduino) != (
+                prev.aim, prev.trigger, prev.recoil, prev.motion,
+                prev.input, prev.arduino):
             self._aim.reload(cfg)
         # tracker depends on the tracking slice (+ the aim.enabled GMC-buffer gate)
         if prev is None or cfg.tracking != prev.tracking or \
