@@ -18,7 +18,7 @@ from ragnarok.config.store import ConfigHandle
 class FieldSpec:
     path: str                     # "section.field"
     label: str
-    kind: str                     # "float" | "int" | "bool" | "choice"
+    kind: str                     # "float" | "int" | "bool" | "choice" | "text"
     minimum: float | None = None
     maximum: float | None = None
     step: float | None = None
@@ -98,6 +98,19 @@ MOTION_FIELDS: tuple[FieldSpec, ...] = (
     FieldSpec("motion.wind", "WindMouse wind", "float", 0.0, 20.0, 0.5),
     FieldSpec("motion.max_step", "WindMouse max step", "float", 1.0, 100.0, 1.0),
     FieldSpec("motion.target_area", "WindMouse target area", "float", 1.0, 100.0, 1.0),
+)
+
+# Input: which mouse driver + the Arduino transport settings. The hardware
+# test-move is box-only; here we only bind config.
+INPUT_FIELDS: tuple[FieldSpec, ...] = (
+    FieldSpec("input.mouse_driver", "Mouse driver", "choice",
+              choices=("sendinput", "arduino")),
+    FieldSpec("arduino.transport", "Arduino transport", "choice",
+              choices=("serial", "udp")),
+    FieldSpec("arduino.port", "Serial port (COM/tty)", "text"),
+    FieldSpec("arduino.baud", "Baud", "int", 1200, 2000000, 100),
+    FieldSpec("arduino.host", "UDP host", "text"),
+    FieldSpec("arduino.udp_port", "UDP port", "int", 0, 65535, 1),
 )
 
 

@@ -94,3 +94,33 @@ def test_enabling_aim_reattaches_gmc_buffer_to_tracker():
     r.reload(new)
     assert aim.reloads == 1                                # aim slice changed
     assert bt == ["BUF"]                                  # enabled -> gmc buffer fed
+
+
+def test_driver_change_rebuilds_aim_controller():
+    base = AppConfig()
+    r, loop, aim, bt, bc = _make(base)
+    new = base.model_copy(update={"input": base.input.model_copy(update={"mouse_driver": "arduino"})})
+    r.reload(new)
+    assert aim.reloads == 1                                # input change -> aim rebuild
+    assert len(bt) == 0 and len(bc) == 0                  # tracker/classifier untouched
+
+
+def test_reload_build_failure_keeps_prev_stale_so_retry_rebuilds():
+    import pytest
+    base = AppConfig()
+    loop = _FullLoop()
+    class _BadAim:
+        def __init__(self): self.calls = 0
+        def reload(self, cfg):
+            self.calls += 1
+            raise RuntimeError("build failed (e.g. arduino empty port)")
+    aim = _BadAim()
+    r = WorkerReloader(loop, aim_reloader=aim, build_tracker=lambda c, *, gmc_buffer=None: "T",
+                       build_classifier=lambda c: "C", initial_cfg=base)
+    changed = base.model_copy(update={"input": base.input.model_copy(update={"mouse_driver": "arduino"})})
+    with pytest.raises(RuntimeError):
+        r.reload(changed)                                 # aim build raises -> propagates
+    assert aim.calls == 1
+    with pytest.raises(RuntimeError):
+        r.reload(changed)                                 # _prev stayed stale -> retries (not skipped as "unchanged")
+    assert aim.calls == 2
