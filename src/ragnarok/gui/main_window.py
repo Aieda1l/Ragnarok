@@ -15,6 +15,7 @@ class MainWindow(QMainWindow):
         self.preview_label.setAlignment(Qt.AlignCenter)
         self.preview_label.setMinimumSize(320, 320)
         self.stats_label = QLabel("--")
+        self.stats_label.setObjectName("mono")   # monospaced telemetry numerals (theme)
         layout.addWidget(self.preview_label)
         layout.addWidget(self.stats_label)
         self.controls = controls
