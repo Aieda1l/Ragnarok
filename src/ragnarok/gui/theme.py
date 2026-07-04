@@ -70,8 +70,6 @@ def build_stylesheet() -> str:
         border: 1px solid {BORDER};
         border-bottom: none;
         margin-right: 2px;
-        text-transform: uppercase;
-        letter-spacing: 1px;
     }}
     QTabBar::tab:selected {{
         background: {BG};
@@ -87,8 +85,6 @@ def build_stylesheet() -> str:
         border: 1px solid {ELECTRIC_YELLOW};
         border-radius: 0px;
         padding: 6px 14px;
-        text-transform: uppercase;
-        letter-spacing: 1px;
     }}
     QPushButton:hover {{ background: {ELECTRIC_YELLOW}; color: {BG}; }}
     QPushButton:pressed {{ background: {CYAN}; color: {BG}; border-color: {CYAN}; }}
