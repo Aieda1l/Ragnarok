@@ -27,6 +27,8 @@ class DashboardPanel(QWidget):
         layout = QVBoxLayout(self)
         self.fps_label = QLabel("FPS --")
         self.lat_label = QLabel("loop p50 -- ms  p99 -- ms")
+        self.fps_label.setObjectName("mono")     # monospaced telemetry numerals (theme)
+        self.lat_label.setObjectName("mono")
         layout.addWidget(self.fps_label)
         layout.addWidget(self.lat_label)
         layout.addStretch(1)

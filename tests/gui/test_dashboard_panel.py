@@ -29,6 +29,13 @@ def test_tick_no_snapshot_is_noop(qtbot):
     assert len(panel.history) == 0
 
 
+def test_telemetry_labels_are_mono_styled(qtbot):
+    panel = DashboardPanel(SnapshotPublisher())
+    qtbot.addWidget(panel)
+    assert panel.fps_label.objectName() == "mono"       # picks up the mono QSS rule
+    assert panel.lat_label.objectName() == "mono"
+
+
 def test_paints_without_error(qtbot):
     pub = SnapshotPublisher()
     panel = DashboardPanel(pub)
