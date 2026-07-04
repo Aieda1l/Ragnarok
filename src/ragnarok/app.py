@@ -20,6 +20,7 @@ from ragnarok.gui.tuning_model import (
 from ragnarok.gui.diagnostics_panel import DiagnosticsPanel
 from ragnarok.gui.profiles_panel import ProfilesPanel
 from ragnarok.gui.calibration_panel import CalibrationPanel
+from ragnarok.gui.dashboard_panel import DashboardPanel
 from ragnarok.gui.live_config import AimReloader, WorkerReloader
 from ragnarok.config.profiles import ProfileStore
 
@@ -147,6 +148,8 @@ def main() -> int:
             warnings.warn(f"config reload failed (keeping previous worker components): {exc}")
 
     tabs = QTabWidget()
+    dashboard = DashboardPanel(publisher)
+    tabs.addTab(dashboard, "Dashboard")
     aim_panel = TuningPanel(handle, on_save=_save)
     aim_panel.configChanged.connect(_on_config_changed)
     tuning_panels.append(aim_panel)
