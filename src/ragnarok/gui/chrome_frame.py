@@ -34,7 +34,7 @@ class ChromeFrame(QWidget):
         x1, y1 = float(self.width() - m), float(self.height() - m)
         if x1 <= x0 or y1 <= y0:
             return
-        yellow = QColor(theme.ELECTRIC_YELLOW)
+        accent = QColor(theme.RED)
         p = QPainter(self)
         p.setRenderHint(QPainter.Antialiasing, True)
         try:
@@ -47,10 +47,10 @@ class ChromeFrame(QWidget):
 
             # left accent bar (filled)
             bx, by, bw, bh = accent_bar_rect(x0, y0, x1, y1, self._accent_w)
-            p.fillRect(int(bx), int(by), int(bw), int(bh), yellow)
+            p.fillRect(int(bx), int(by), int(bw), int(bh), accent)
 
             # corner brackets
-            p.setPen(QPen(yellow, 2))
+            p.setPen(QPen(accent, 2))
             for (a, b) in corner_bracket_segments(x0, y0, x1, y1, self._arm):
                 p.drawLine(QPointF(a[0], a[1]), QPointF(b[0], b[1]))
         finally:
