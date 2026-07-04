@@ -9,19 +9,20 @@ from __future__ import annotations
 
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
-    QCheckBox, QComboBox, QDoubleSpinBox, QFormLayout, QLineEdit, QPushButton,
-    QVBoxLayout, QWidget,
+    QCheckBox, QComboBox, QDoubleSpinBox, QFormLayout, QLabel, QLineEdit,
+    QPushButton, QVBoxLayout, QWidget,
 )
 
 from ragnarok.gui.tuning_model import AIM_FIELDS, apply_field, get_field
 from ragnarok.gui.segmented_toggle import SegmentedToggle
 from ragnarok.gui.cyber_slider import CyberSlider
+from ragnarok.gui.arrow_selector import ArrowSelector
 
 
 class TuningPanel(QWidget):
     configChanged = Signal(object)          # emits the new AppConfig
 
-    def __init__(self, handle, fields=AIM_FIELDS, *, on_save=None) -> None:
+    def __init__(self, handle, fields=AIM_FIELDS, *, on_save=None, title=None) -> None:
         super().__init__()
         self._handle = handle
         self._fields = tuple(fields)
@@ -29,6 +30,10 @@ class TuningPanel(QWidget):
         self._widgets: dict[str, QWidget] = {}
 
         root = QVBoxLayout(self)
+        if title:
+            header = QLabel(title.upper())
+            header.setObjectName("header")           # styled section header
+            root.addWidget(header)
         form = QFormLayout()
         cfg = handle.current
         for spec in self._fields:
@@ -57,7 +62,7 @@ class TuningPanel(QWidget):
             try:
                 if isinstance(w, (QCheckBox, SegmentedToggle)):
                     w.setChecked(bool(value))
-                elif isinstance(w, QComboBox):
+                elif isinstance(w, (QComboBox, ArrowSelector)):
                     w.setCurrentText(str(value))
                 elif isinstance(w, QLineEdit):
                     w.setText("" if value is None else str(value))
@@ -87,7 +92,7 @@ class TuningPanel(QWidget):
             w.stateChanged.connect(lambda _s, p=path: self._commit(p))
             return w
         if spec.kind == "choice":
-            w = QComboBox()
+            w = ArrowSelector()                    # CP2077 ◁ value ▷ selector
             w.addItems(list(spec.choices))
             w.setCurrentText(str(value))
             w.currentIndexChanged.connect(lambda _i, p=path: self._commit(p))
@@ -119,7 +124,7 @@ class TuningPanel(QWidget):
         w = self._widgets[path]
         if isinstance(w, (QCheckBox, SegmentedToggle)):
             return w.isChecked()
-        if isinstance(w, QComboBox):
+        if isinstance(w, (QComboBox, ArrowSelector)):
             return w.currentText()
         if isinstance(w, QLineEdit):
             return w.text()
