@@ -61,10 +61,10 @@ def test_fov_bracket_segments_two_verticals_and_four_diagonal_arms():
     assert len(thick) == 4
     for (ax, ay), (bx, by) in thick:
         assert abs(bx - ax) == 10.0 and abs(by - ay) == 10.0        # 45°, length arm
-    # left-top arm starts at the top-left corner, heads UP-and-LEFT (up + outward)
-    assert thick[0] == ((60.0, 60.0), (50.0, 50.0))
-    # right-bottom arm starts at bottom-right, heads DOWN-and-RIGHT (down + outward)
-    assert thick[3] == ((140.0, 140.0), (150.0, 150.0))
+    # left-top serif starts at the top-left corner, heads UP-and-IN (up-right)
+    assert thick[0] == ((60.0, 60.0), (70.0, 50.0))
+    # right-bottom serif starts at bottom-right, heads DOWN-and-IN (down-left)
+    assert thick[3] == ((140.0, 140.0), (130.0, 150.0))
 
 
 def test_ray_rect_edge_and_in_viewport():
