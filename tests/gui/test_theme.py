@@ -16,3 +16,25 @@ def test_team_color_maps_all_teams_distinctly():
     assert len(cols) == 3
     # enemy = warm/orange, teammate = blue (mirrors gui/overlay.TEAM_BGR)
     assert theme.team_color(Team.ENEMY) != theme.team_color(Team.TEAMMATE)
+
+
+def test_stylesheet_is_wellformed_and_uses_the_accent():
+    qss = theme.build_stylesheet()
+    assert isinstance(qss, str) and len(qss) > 200
+    assert theme.ELECTRIC_YELLOW in qss and theme.NEAR_BLACK in qss
+    assert qss.count("{") == qss.count("}")               # balanced braces
+    assert "QTabBar::tab" in qss and "QPushButton" in qss and "QLabel#mono" in qss
+
+
+def test_load_fonts_absent_dir_is_empty_and_qt_free(tmp_path):
+    assert theme.load_fonts(tmp_path / "does_not_exist") == []
+    assert theme.load_fonts(tmp_path) == []               # empty dir -> nothing
+
+
+def test_apply_theme_sets_stylesheet_without_a_real_qapp():
+    class _App:
+        def __init__(self): self.qss = None
+        def setStyleSheet(self, s): self.qss = s
+    app = _App()
+    theme.apply_theme(app, font_dir="/nonexistent")       # absent dir -> no Qt font import
+    assert app.qss and theme.ELECTRIC_YELLOW in app.qss
