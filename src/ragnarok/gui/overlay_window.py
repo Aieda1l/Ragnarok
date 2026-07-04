@@ -60,19 +60,20 @@ class FovOverlay(QWidget):
             p.end()
 
     def _draw_scene(self, p: QPainter, scene) -> None:
-        yellow = QColor(theme.ELECTRIC_YELLOW)
+        cyan = QColor(theme.CYAN)
         red = QColor(theme.ALERT_RED)
 
-        # FOV brackets: thin verticals + bold 45° corner arms (smart-weapon frame)
-        p.setPen(QPen(yellow, 1))
+        # FOV brackets: thin verticals + bold 45° corner arms (smart-weapon frame,
+        # cyan/teal like the CP2077 smart-link reticle)
+        p.setPen(QPen(cyan, 1))
         for (a, b) in scene.fov_thin:
             p.drawLine(QPointF(a[0], a[1]), QPointF(b[0], b[1]))
-        p.setPen(QPen(yellow, 3))                      # arms are bolder than the verticals
+        p.setPen(QPen(cyan, 3))                        # arms are bolder than the verticals
         for (a, b) in scene.fov_thick:
             p.drawLine(QPointF(a[0], a[1]), QPointF(b[0], b[1]))
 
         # crosshair tick
-        p.setPen(QPen(yellow, 1))
+        p.setPen(QPen(cyan, 1))
         cx, cy = scene.crosshair
         p.drawLine(QPointF(cx - 6, cy), QPointF(cx + 6, cy))
         p.drawLine(QPointF(cx, cy - 6), QPointF(cx, cy + 6))
@@ -96,7 +97,7 @@ class FovOverlay(QWidget):
         # thin dashed tracking line: crosshair -> locked diamond
         if scene.locked_line is not None:
             a, b = scene.locked_line
-            pen = QPen(yellow, 1)
+            pen = QPen(cyan, 1)
             pen.setStyle(Qt.DashLine)
             p.setPen(pen)
             p.drawLine(QPointF(a[0], a[1]), QPointF(b[0], b[1]))
