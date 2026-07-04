@@ -94,6 +94,8 @@ def _build_aim_controller(cfg, commanded_buffer):
 
 def main() -> int:
     app = QApplication(sys.argv)
+    from ragnarok.gui import theme
+    theme.apply_theme(app)                 # Cyberpunk 2077 skin (spec §10.1)
     cfg = load_config(_config_path())
     publisher = SnapshotPublisher()
     if cfg.tracking.gmc == "feedforward":
