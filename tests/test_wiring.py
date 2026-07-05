@@ -5,7 +5,7 @@ from ragnarok.config.schema import AppConfig
 from ragnarok.wiring import build_tracker, build_classifier
 from ragnarok.tracking.base import IdentityTracker
 from ragnarok.tracking.botsort import BotSortTracker
-from ragnarok.classification.base import NullClassifier, HSVRingClassifier
+from ragnarok.classification.base import AllEnemyClassifier, HSVRingClassifier
 
 
 def test_build_tracker_default_is_botsort():
@@ -28,9 +28,11 @@ def test_build_classifier_default_is_hsv_ring():
     assert isinstance(build_classifier(AppConfig()), HSVRingClassifier)
 
 
-def test_build_classifier_disabled_is_null():
+def test_build_classifier_disabled_targets_all():
+    # Friend/foe OFF => every detection is a target (AllEnemyClassifier stamps
+    # ENEMY), NOT NullClassifier (which would leave tracks UNKNOWN -> aim nothing).
     cfg = AppConfig(classification={"enabled": False})
-    assert isinstance(build_classifier(cfg), NullClassifier)
+    assert isinstance(build_classifier(cfg), AllEnemyClassifier)
 
 
 def test_build_classifier_resolves_profile():
