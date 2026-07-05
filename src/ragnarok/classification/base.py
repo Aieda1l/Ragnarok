@@ -19,9 +19,17 @@ class FriendFoeClassifier(ABC):
 
 
 class NullClassifier(FriendFoeClassifier):
-    """Default / test fake: pass tracks through unchanged."""
+    """Default / test fake: pass tracks through unchanged (tracks keep UNKNOWN)."""
     def classify(self, tracks: Tracks, image: np.ndarray) -> Tracks:
         return tracks
+
+
+class AllEnemyClassifier(FriendFoeClassifier):
+    """Friend/foe disabled: stamp every track ENEMY so aim + trigger engage all
+    detections (otherwise tracks stay UNKNOWN and the ENEMY-only selector locks
+    nothing)."""
+    def classify(self, tracks: Tracks, image: np.ndarray) -> Tracks:
+        return Tracks(items=tuple(replace(tr, team=Team.ENEMY) for tr in tracks))
 
 
 class HSVRingClassifier(FriendFoeClassifier):

@@ -68,11 +68,14 @@ TRACKING_FIELDS: tuple[FieldSpec, ...] = (
     FieldSpec("tracking.tau_render_s", "τ_render (s)", "float", 0.0, 0.1, 0.001),
 )
 
-# Palette + enemy_color are the eyedropper wizard's domain (changing palette
-# without a matching color key can break resolve_enemy_profile), so only the
-# safe threshold/vote knobs are exposed here.
+# enemy_color is exposed with the "default" palette keys. The colorblind "wong"
+# palette (and its color keys) stays TOML-only: switching palette without a
+# matching color key would break resolve_enemy_profile, and that combo needs the
+# eyedropper wizard's palette-aware choices rather than a fixed tuple.
 CLASSIFICATION_FIELDS: tuple[FieldSpec, ...] = (
     FieldSpec("classification.enabled", "Friend/Foe enabled", "bool"),
+    FieldSpec("classification.enemy_color", "Enemy color", "choice",
+              choices=("red", "purple", "yellow")),
     FieldSpec("classification.frac_threshold", "Outline frac thresh", "float", 0.0, 1.0, 0.01),
     FieldSpec("classification.thickness", "Ring thickness (px)", "int", 1, 64, 1),
     FieldSpec("classification.vote_window", "Vote window", "int", 1, 120, 1),

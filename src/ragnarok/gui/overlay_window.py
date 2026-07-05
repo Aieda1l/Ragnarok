@@ -38,10 +38,51 @@ class FovOverlay(QWidget):
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool)
         self.setAttribute(Qt.WA_TranslucentBackground, True)
         self.setAttribute(Qt.WA_TransparentForMouseEvents, True)
+        self.setAttribute(Qt.WA_ShowWithoutActivating, True)   # never steal game focus
         self._timer = QTimer(self)
         self._timer.setInterval(interval_ms)          # own timer, decoupled from hot loop
         self._timer.timeout.connect(self.update)      # schedule a repaint
         self._timer.start()
+        # Re-assert topmost periodically so other apps can't cover the overlay.
+        self._topmost_timer = QTimer(self)
+        self._topmost_timer.setInterval(1000)
+        self._topmost_timer.timeout.connect(self._reassert_topmost)
+        self._topmost_timer.start()
+
+    # -- OS-level window integration (Win32; box-only, no-op elsewhere) ---
+    def showEvent(self, event) -> None:
+        super().showEvent(event)
+        self._apply_click_through()
+
+    def _apply_click_through(self) -> None:
+        """Apply Win32 WS_EX_TRANSPARENT|LAYERED|TOPMOST|NOACTIVATE so clicks pass
+        through to the game and the overlay never activates. Qt's
+        WA_TransparentForMouseEvents is Qt-level only; games need the native style."""
+        try:
+            import ctypes
+            GWL_EXSTYLE = -20
+            EX = 0x20 | 0x80000 | 0x8 | 0x08000000 | 0x80   # TRANSPARENT|LAYERED|TOPMOST|NOACTIVATE|TOOLWINDOW
+            u = ctypes.windll.user32
+            u.GetWindowLongW.restype = ctypes.c_long
+            hwnd = int(self.winId())
+            style = u.GetWindowLongW(hwnd, GWL_EXSTYLE)
+            u.SetWindowLongW(hwnd, GWL_EXSTYLE, style | EX)
+            self._reassert_topmost()
+        except Exception:
+            pass                                      # non-Windows / no native handle
+
+    def _reassert_topmost(self) -> None:
+        try:
+            import ctypes
+            from ctypes import wintypes
+            u = ctypes.windll.user32
+            u.SetWindowPos.argtypes = [wintypes.HWND, wintypes.HWND, ctypes.c_int,
+                                       ctypes.c_int, ctypes.c_int, ctypes.c_int, wintypes.UINT]
+            SWP = 0x0001 | 0x0002 | 0x0010            # NOSIZE|NOMOVE|NOACTIVATE
+            u.SetWindowPos(wintypes.HWND(int(self.winId())), wintypes.HWND(-1),
+                           0, 0, 0, 0, SWP)           # HWND_TOPMOST = -1
+        except Exception:
+            pass
 
     # -- rendering -------------------------------------------------------
     def paintEvent(self, event) -> None:
