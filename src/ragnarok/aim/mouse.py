@@ -36,6 +36,22 @@ MOUSEEVENTF_RIGHTUP: int = 0x0010
 MOUSEEVENTF_MIDDLEDOWN: int = 0x0020
 MOUSEEVENTF_MIDDLEUP: int = 0x0040
 
+# Windows applies the pointer-speed slider (Settings > Mouse) as a linear
+# multiplier to *relative* SendInput deltas BEFORE they move the cursor, so an
+# aimer commanding N counts moves fewer pixels unless we pre-compensate. Slider
+# 1..20 -> multiplier (10 = neutral 1.0x); the documented MouseSensitivity curve.
+_POINTER_SPEED_MULT: dict[int, float] = {
+    1: 0.1, 2: 0.2, 3: 0.3, 4: 0.4, 5: 0.4, 6: 0.5, 7: 0.6, 8: 0.7, 9: 0.8,
+    10: 1.0, 11: 1.1, 12: 1.2, 13: 1.3, 14: 1.4, 15: 1.5, 16: 1.6, 17: 1.7,
+    18: 1.8, 19: 1.9, 20: 2.0,
+}
+
+
+def pointer_speed_multiplier(speed: int) -> float:
+    """Windows pointer-speed slider (1..20) -> linear multiplier on relative
+    SendInput deltas. Out-of-range / unknown -> 1.0 (assume neutral)."""
+    return _POINTER_SPEED_MULT.get(int(speed), 1.0)
+
 # ---------------------------------------------------------------------------
 # ctypes structs — exact field order/types matching winuser.h
 # ---------------------------------------------------------------------------
@@ -114,12 +130,33 @@ def _make_real_send() -> Callable[[int, int, int], int]:
             "SendInput structs not available on this platform"
         )
     user32 = ctypes.WinDLL("user32", use_last_error=True)  # type: ignore[attr-defined]
+
+    # Pre-compensate Windows pointer ballistics so N commanded counts move N px.
+    # SPI_GETMOUSESPEED (0x70) -> 1..20 slider; SPI_GETMOUSE (0x03)[2] -> EPP flag.
+    SPI_GETMOUSE, SPI_GETMOUSESPEED = 0x0003, 0x0070
+    speed = ctypes.c_int()
+    user32.SystemParametersInfoA(SPI_GETMOUSESPEED, 0, ctypes.byref(speed), 0)
+    accel = (ctypes.c_int * 3)()
+    user32.SystemParametersInfoA(SPI_GETMOUSE, 0, ctypes.byref(accel), 0)
+    if accel[2]:  # "Enhance pointer precision" — non-linear, cannot invert cleanly
+        import warnings
+        warnings.warn(
+            "Windows 'Enhance pointer precision' is ON: SendInput moves are "
+            "accelerated non-linearly and cannot be fully compensated. Disable it "
+            "(Settings > Mouse) or use the Arduino driver for accurate aim.",
+            stacklevel=2,
+        )
+    inv = 1.0 / pointer_speed_multiplier(speed.value)
+
     fn = user32.SendInput
     fn.argtypes = (wintypes.UINT, ctypes.POINTER(INPUT), ctypes.c_int)
     fn.restype = wintypes.UINT
     cbsize = ctypes.sizeof(INPUT)
 
     def _send(dx: int, dy: int, flags: int) -> int:
+        if flags == MOUSEEVENTF_MOVE:          # compensate motion only, never clicks
+            dx = int(round(dx * inv))
+            dy = int(round(dy * inv))
         inp = INPUT(
             type=INPUT_MOUSE,
             u=_INPUTunion(mi=MOUSEINPUT(dx, dy, 0, flags, 0, 0)),
