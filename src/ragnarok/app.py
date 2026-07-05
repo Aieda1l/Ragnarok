@@ -33,30 +33,10 @@ def _config_path() -> Path:
 def _profiles_dir() -> Path:
     return _config_path().parent / "profiles"
 
-def _build_aim_controller(cfg, commanded_buffer):
-    """Build the AimController from cfg (Windows-only deps imported lazily).
+def _build_mouse(cfg):
+    """Box-only mouse driver (SendInput or Arduino) from cfg.input."""
+    from ragnarok.aim.mouse import SendInputMouseDriver
 
-    Wires the Phase 4 collaborators: selected aimer, motion shaper, velocity
-    smoother, adaptive lead, recoil compensator, and a safety-gated trigger bot
-    (with its own key provider), plus a commanded-motion buffer for the GMC.
-    """
-    from ragnarok.aim.keys import AsyncKeyStateProvider, make_aim_active
-    from ragnarok.aim.mouse import SendInputMouseDriver, MouseButton
-    from ragnarok.aim.fov import fov_deg_to_radius_px
-    from ragnarok.aim.select import TargetSelector
-    from ragnarok.aim.imm import IMMManager
-    from ragnarok.aim.velocity import VelocitySmoother
-    from ragnarok.aim.controller import AimController
-    from ragnarok.latency.adaptive_lead import AdaptiveLead
-    from ragnarok.trigger.bot import TriggerBot
-    from ragnarok.wiring import build_aimer, build_shaper, build_recoil
-
-    a = cfg.aim
-    fov_px = fov_deg_to_radius_px(a.aim_fov_deg, a.hfov_deg, a.screen_width_px)
-    retain_px = fov_deg_to_radius_px(a.retain_fov_deg, a.hfov_deg, a.screen_width_px)
-    selector = TargetSelector(fov_px=fov_px, retain_fov_px=retain_px,
-                              dwell_ms=a.dwell_ms, switch_margin=a.switch_margin,
-                              head_frac=a.head_frac)
     def _sendinput():
         m = SendInputMouseDriver()
         m.connect()
@@ -68,19 +48,74 @@ def _build_aim_controller(cfg, commanded_buffer):
         d.connect()
         return d
 
-    mouse = build_mouse_driver(cfg, sendinput_factory=_sendinput, arduino_factory=_arduino)
-    is_active = make_aim_active(AsyncKeyStateProvider(a.aim_key), toggle=a.toggle)
+    return build_mouse_driver(cfg, sendinput_factory=_sendinput, arduino_factory=_arduino)
 
-    trigger = None
-    trigger_active = None
+
+def _build_trigger_bot(cfg, mouse):
+    """A safety-gated TriggerBot + its key provider (None if trigger disabled)."""
+    from ragnarok.aim.keys import AsyncKeyStateProvider, make_aim_active
+    from ragnarok.aim.mouse import MouseButton
+    from ragnarok.trigger.bot import TriggerBot
+
+    if not cfg.trigger.enabled:
+        return None, None
+    btn = {"left": MouseButton.LEFT, "right": MouseButton.RIGHT,
+           "middle": MouseButton.MIDDLE}[cfg.trigger.button]
+    trigger = TriggerBot(mouse=mouse,
+                         activation_delay_s=cfg.trigger.activation_delay_ms / 1000.0,
+                         button=btn)
+    trigger_active = make_aim_active(
+        AsyncKeyStateProvider(cfg.trigger.trigger_key), toggle=False)
+    return trigger, trigger_active
+
+
+def _build_fire_component(cfg, commanded_buffer):
+    """The loop's per-tick fire/aim component: AimController when aim is enabled,
+    else a standalone TriggerController when only the trigger is enabled, else None."""
+    if cfg.aim.enabled:
+        return _build_aim_controller(cfg, commanded_buffer)
     if cfg.trigger.enabled:
-        btn = {"left": MouseButton.LEFT, "right": MouseButton.RIGHT,
-               "middle": MouseButton.MIDDLE}[cfg.trigger.button]
-        trigger = TriggerBot(mouse=mouse,
-                             activation_delay_s=cfg.trigger.activation_delay_ms / 1000.0,
-                             button=btn)
-        trigger_active = make_aim_active(
-            AsyncKeyStateProvider(cfg.trigger.trigger_key), toggle=False)
+        return _build_trigger_controller(cfg)
+    return None
+
+
+def _build_trigger_controller(cfg):
+    """Standalone trigger bot (fires without aim assist) for aim-disabled use."""
+    from ragnarok.trigger.controller import TriggerController
+    from ragnarok.wiring import build_recoil
+
+    mouse = _build_mouse(cfg)
+    trigger, trigger_active = _build_trigger_bot(cfg, mouse)
+    return TriggerController(
+        cfg.aim, trigger=trigger, trigger_active=trigger_active, mouse=mouse,
+        roi_size=cfg.capture.roi_size, recoil=build_recoil(cfg))
+
+
+def _build_aim_controller(cfg, commanded_buffer):
+    """Build the AimController from cfg (Windows-only deps imported lazily).
+
+    Wires the Phase 4 collaborators: selected aimer, motion shaper, velocity
+    smoother, adaptive lead, recoil compensator, and a safety-gated trigger bot
+    (with its own key provider), plus a commanded-motion buffer for the GMC.
+    """
+    from ragnarok.aim.keys import AsyncKeyStateProvider, make_aim_active
+    from ragnarok.aim.fov import fov_deg_to_radius_px
+    from ragnarok.aim.select import TargetSelector
+    from ragnarok.aim.imm import IMMManager
+    from ragnarok.aim.velocity import VelocitySmoother
+    from ragnarok.aim.controller import AimController
+    from ragnarok.latency.adaptive_lead import AdaptiveLead
+    from ragnarok.wiring import build_aimer, build_shaper, build_recoil
+
+    a = cfg.aim
+    fov_px = fov_deg_to_radius_px(a.aim_fov_deg, a.hfov_deg, a.screen_width_px)
+    retain_px = fov_deg_to_radius_px(a.retain_fov_deg, a.hfov_deg, a.screen_width_px)
+    selector = TargetSelector(fov_px=fov_px, retain_fov_px=retain_px,
+                              dwell_ms=a.dwell_ms, switch_margin=a.switch_margin,
+                              head_frac=a.head_frac)
+    mouse = _build_mouse(cfg)
+    is_active = make_aim_active(AsyncKeyStateProvider(a.aim_key), toggle=a.toggle)
+    trigger, trigger_active = _build_trigger_bot(cfg, mouse)
 
     return AimController(
         a, selector=selector, imm_manager=IMMManager(),
@@ -113,7 +148,7 @@ def main() -> int:
             warnings.warn("GMC 'feedforward' is enabled but inert: " + "; ".join(reasons))
     from ragnarok.tracking.egomotion import CommandedMotionBuffer
     cmd_buffer = CommandedMotionBuffer()
-    aim_controller = _build_aim_controller(cfg, cmd_buffer) if cfg.aim.enabled else None
+    aim_controller = _build_fire_component(cfg, cmd_buffer)
     loop = WorkerLoop(
         create_capturer(cfg.capture), create_detector(cfg.detection),
         StageProfiler(), publisher,
@@ -125,7 +160,7 @@ def main() -> int:
     # Live config: the tuning panel edits funnel through ConfigHandle.swap and
     # rebuild the aim controller in-place (spec §13 immutable snapshot swap).
     handle = ConfigHandle(cfg)
-    aim_reloader = AimReloader(loop, _build_aim_controller, commanded_buffer=cmd_buffer)
+    aim_reloader = AimReloader(loop, _build_fire_component, commanded_buffer=cmd_buffer)
     reloader = WorkerReloader(
         loop, aim_reloader=aim_reloader,
         build_tracker=build_tracker, build_classifier=build_classifier,
