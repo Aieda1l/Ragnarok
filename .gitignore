@@ -59,3 +59,7 @@ Thumbs.db
 
 # built TensorRT engines + ONNX (large, box-specific)
 engines/
+
+# local training dataset (large, box-specific)
+dataset/
+output/
