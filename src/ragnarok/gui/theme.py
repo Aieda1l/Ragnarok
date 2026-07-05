@@ -57,6 +57,16 @@ def build_stylesheet() -> str:
     QMainWindow, QDialog {{ background: {BG}; }}
     QLabel {{ background: transparent; color: {LABEL}; }}
     QLabel#mono {{ font-family: {MONO_STACK}; color: {CYAN}; }}
+    /* section header — light, bold, with a cyan underline divider */
+    QLabel#header {{
+        color: {TEXT}; font-size: 15px; font-weight: bold;
+        padding: 4px 0px; border-bottom: 1px solid {CYAN}; margin-bottom: 4px;
+    }}
+    /* flat ◁ ▷ selector arrows (ArrowSelector) */
+    QPushButton:flat {{ color: {RED}; border: none; background: transparent;
+                        font-size: 15px; padding: 0px; }}
+    QPushButton:flat:hover {{ color: {CYAN}; }}
+    QPushButton:flat:disabled {{ color: {TEXT_DIM}; }}
 
     /* Tabs — inactive red, active cyan with a cyan top edge */
     QTabWidget::pane {{ border: 1px solid {BORDER}; top: -1px; }}
@@ -118,14 +128,15 @@ def build_stylesheet() -> str:
     QCheckBox::indicator:checked {{ background: {CYAN}; border: 1px solid {CYAN}; }}
     QCheckBox::indicator:hover {{ border: 1px solid {RED}; }}
 
-    /* Scroll bars — thin, red on hover */
-    QScrollBar:vertical {{ background: {BG}; width: 10px; margin: 0; }}
-    QScrollBar::handle:vertical {{ background: {BORDER}; min-height: 24px; }}
-    QScrollBar::handle:vertical:hover {{ background: {RED}; }}
-    QScrollBar:horizontal {{ background: {BG}; height: 10px; margin: 0; }}
-    QScrollBar::handle:horizontal {{ background: {BORDER}; min-width: 24px; }}
-    QScrollBar::handle:horizontal:hover {{ background: {RED}; }}
+    /* Scroll bars — thin, red handle (CP2077 accent) brightening on hover */
+    QScrollBar:vertical {{ background: {BG}; width: 8px; margin: 0; }}
+    QScrollBar::handle:vertical {{ background: {RED}; min-height: 30px; }}
+    QScrollBar::handle:vertical:hover {{ background: {CYAN}; }}
+    QScrollBar:horizontal {{ background: {BG}; height: 8px; margin: 0; }}
+    QScrollBar::handle:horizontal {{ background: {RED}; min-width: 30px; }}
+    QScrollBar::handle:horizontal:hover {{ background: {CYAN}; }}
     QScrollBar::add-line, QScrollBar::sub-line {{ height: 0; width: 0; }}
+    QScrollArea {{ border: none; }}
     """
 
 
