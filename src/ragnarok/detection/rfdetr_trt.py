@@ -66,12 +66,23 @@ class _TensorRTSession:  # pragma: no cover — box-only (tensorrt + torch/CUDA 
             self._engine = trt.Runtime(logger).deserialize_cuda_engine(f.read())
         self._ctx = self._engine.create_execution_context()
 
-        self._inp = torch.zeros((1, 3, _RESOLUTION, _RESOLUTION), device="cuda")
-        self._dets = torch.zeros((1, 300, 4), device="cuda")
-        self._labels = torch.zeros((1, 300, 91), device="cuda")
-        self._ctx.set_tensor_address("input", self._inp.data_ptr())
-        self._ctx.set_tensor_address("dets", self._dets.data_ptr())
-        self._ctx.set_tensor_address("labels", self._labels.data_ptr())
+        # Allocate one CUDA buffer per engine I/O tensor from its declared shape,
+        # so the runtime adapts to the model's class count (91 for the base model,
+        # N for a trained model) and input resolution automatically.
+        self._buf = {}
+        self._input = self._box = self._lbl = None
+        for i in range(self._engine.num_io_tensors):
+            name = self._engine.get_tensor_name(i)
+            shape = tuple(int(d) for d in self._engine.get_tensor_shape(name))
+            self._buf[name] = torch.zeros(shape, device="cuda")
+            self._ctx.set_tensor_address(name, self._buf[name].data_ptr())
+            if self._engine.get_tensor_mode(name) == trt.TensorIOMode.INPUT:
+                self._input = name
+            elif shape[-1] == 4:            # boxes tensor -> last dim 4
+                self._box = name
+            else:                           # class logits tensor
+                self._lbl = name
+        _, _, self._in_h, self._in_w = self._buf[self._input].shape
         self._stream = torch.cuda.Stream()
         self._mean = torch.tensor(_MEAN, device="cuda").view(1, 3, 1, 1)
         self._std = torch.tensor(_STD, device="cuda").view(1, 3, 1, 1)
@@ -80,12 +91,12 @@ class _TensorRTSession:  # pragma: no cover — box-only (tensorrt + torch/CUDA 
     def infer(self, rgb, *, threshold: float):
         torch = self._torch
         h, w = rgb.shape[:2]
-        img = cv2.resize(rgb, (_RESOLUTION, _RESOLUTION))
+        img = cv2.resize(rgb, (self._in_w, self._in_h))
         t = torch.from_numpy(img).to("cuda").float().permute(2, 0, 1).unsqueeze(0) / 255.0
-        self._inp.copy_((t - self._mean) / self._std)
+        self._buf[self._input].copy_((t - self._mean) / self._std)
         self._ctx.execute_async_v3(self._stream.cuda_stream)
         self._stream.synchronize()
-        outputs = {"pred_logits": self._labels, "pred_boxes": self._dets}
+        outputs = {"pred_logits": self._buf[self._lbl], "pred_boxes": self._buf[self._box]}
         target = torch.tensor([[h, w]], device="cuda")
         res = self._post(outputs, target)[0]
         keep = res["scores"] >= threshold
