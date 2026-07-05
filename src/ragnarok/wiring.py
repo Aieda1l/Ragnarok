@@ -9,7 +9,8 @@ from __future__ import annotations
 
 from ragnarok.config.schema import AppConfig
 from ragnarok.tracking.base import Tracker, IdentityTracker
-from ragnarok.classification.base import FriendFoeClassifier, NullClassifier
+from ragnarok.classification.base import (
+    FriendFoeClassifier, NullClassifier, AllEnemyClassifier)
 
 
 def build_tracker(cfg: AppConfig, *, gmc_buffer=None) -> Tracker:
@@ -40,7 +41,7 @@ def build_tracker(cfg: AppConfig, *, gmc_buffer=None) -> Tracker:
 def build_classifier(cfg: AppConfig) -> FriendFoeClassifier:
     c = cfg.classification
     if not c.enabled:
-        return NullClassifier()
+        return AllEnemyClassifier()          # off => treat every detection as a target
     from ragnarok.classification.base import HSVRingClassifier
     from ragnarok.classification.color import resolve_enemy_profile
     profile = resolve_enemy_profile(c.palette, c.enemy_color)
