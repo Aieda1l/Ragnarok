@@ -44,7 +44,9 @@ AIM_FIELDS: tuple[FieldSpec, ...] = (
     FieldSpec("aim.sensitivity", "Sensitivity (deg/count)", "float", 0.001, 1.0, 0.001),
     FieldSpec("aim.lead_ms", "Lead (ms)", "float", 0.0, 500.0, 5.0),
     FieldSpec("aim.head_frac", "Head fraction", "float", 0.0, 1.0, 0.01),
-    FieldSpec("aim.aim_point", "Aim point", "choice", choices=("head", "body")),
+    FieldSpec("aim.aim_point", "Aim point", "choice",
+              choices=("head", "body", "detected_head")),
+    FieldSpec("aim.head_class_id", "Head class id", "int", 0, 90, 1),
     FieldSpec("aim.adaptive_lead", "Adaptive lead", "bool"),
 )
 

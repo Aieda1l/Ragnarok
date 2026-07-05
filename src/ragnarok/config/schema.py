@@ -39,8 +39,9 @@ class AimConfig(BaseModel):
     max_step_px: float = Field(default=60.0, gt=0.0)
     flick_speed_px_s: float = Field(default=4000.0, gt=0.0)
     ema_alpha: float = Field(default=0.5, gt=0.0, le=1.0)
-    aim_point: Literal["head", "body"] = "head"
+    aim_point: Literal["head", "body", "detected_head"] = "head"
     head_frac: float = Field(default=0.15, ge=0.0, le=1.0)
+    head_class_id: int = Field(default=1, ge=0)   # detection class = head (for "detected_head")
     sensitivity: float = Field(default=0.022, gt=0.0)              # deg per mouse count
     lead_ms: float = Field(default=40.0, ge=0.0, le=500.0)
     # --- Phase 4 additions ---
