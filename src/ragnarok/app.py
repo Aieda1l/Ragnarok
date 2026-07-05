@@ -15,12 +15,13 @@ from ragnarok.gui.main_window import MainWindow
 from ragnarok.gui.overlay_window import FovOverlay
 from ragnarok.gui.tuning_panel import TuningPanel
 from ragnarok.gui.tuning_model import (
-    TRACKING_FIELDS, CLASSIFICATION_FIELDS, TRIGGER_FIELDS, RECOIL_FIELDS,
-    MOTION_FIELDS, INPUT_FIELDS)
+    TRACKING_FIELDS, CLASSIFICATION_FIELDS, TRIGGER_FIELDS, MOTION_FIELDS,
+    INPUT_FIELDS)
 from ragnarok.gui.diagnostics_panel import DiagnosticsPanel
 from ragnarok.gui.profiles_panel import ProfilesPanel
 from ragnarok.gui.calibration_panel import CalibrationPanel
 from ragnarok.gui.dashboard_panel import DashboardPanel
+from ragnarok.gui.recoil_panel import RecoilPanel
 from ragnarok.gui.chrome_frame import ChromeFrame
 from ragnarok.gui.live_config import AimReloader, WorkerReloader
 from ragnarok.config.profiles import ProfileStore
@@ -171,13 +172,15 @@ def main() -> int:
     for fields, title in ((TRACKING_FIELDS, "Tracking"),
                           (CLASSIFICATION_FIELDS, "Friend/Foe"),
                           (TRIGGER_FIELDS, "Trigger"),
-                          (RECOIL_FIELDS, "Recoil"),
                           (MOTION_FIELDS, "Motion"),
                           (INPUT_FIELDS, "Input")):
         p = TuningPanel(handle, fields=fields, on_save=_save, title=title)
         p.configChanged.connect(_on_config_changed)
         tuning_panels.append(p)
         tabs.addTab(_scroll(p), title)
+    recoil = RecoilPanel(handle)                 # dedicated spray-pattern editor
+    recoil.configChanged.connect(_on_config_changed)
+    tabs.addTab(_scroll(recoil), "Recoil")
     profiles = ProfilesPanel(ProfileStore(_profiles_dir()), handle)
     profiles.configChanged.connect(_on_config_changed)
     tabs.addTab(_scroll(profiles), "Profiles")
