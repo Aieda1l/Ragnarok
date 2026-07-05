@@ -14,6 +14,7 @@ from __future__ import annotations
 from ragnarok.core.clock import now_ns
 from ragnarok.core.types import Tracks
 from ragnarok.aim.fov import aim_point
+from ragnarok.aim.head import resolve_aim_point
 from ragnarok.motion.shaper import NullShaper
 
 
@@ -85,7 +86,9 @@ class AimController:
         if track is None:
             return
 
-        ax, ay = aim_point(track, self._cfg.head_frac, self._cfg.aim_point)
+        ax, ay = resolve_aim_point(
+            track, tracks, mode=self._cfg.aim_point, head_frac=self._cfg.head_frac,
+            head_class_id=getattr(self._cfg, "head_class_id", 1))
         dt = self._dt(t_capture_ns)
         self._imm.update(tid, ax, ay, dt)
 
