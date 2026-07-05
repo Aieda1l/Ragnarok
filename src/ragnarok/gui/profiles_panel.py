@@ -8,8 +8,10 @@ from __future__ import annotations
 
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
-    QComboBox, QHBoxLayout, QLineEdit, QPushButton, QVBoxLayout, QWidget,
+    QComboBox, QFileDialog, QHBoxLayout, QLineEdit, QPushButton, QVBoxLayout, QWidget,
 )
+
+from ragnarok.config.portable import export_config, import_config
 
 
 class ProfilesPanel(QWidget):
@@ -41,6 +43,15 @@ class ProfilesPanel(QWidget):
         row2.addWidget(load)
         row2.addWidget(delete)
         root.addLayout(row2)
+
+        row3 = QHBoxLayout()
+        imp = QPushButton("Import…")
+        imp.clicked.connect(self._import_dialog)
+        exp = QPushButton("Export…")
+        exp.clicked.connect(self._export_dialog)
+        row3.addWidget(imp)
+        row3.addWidget(exp)
+        root.addLayout(row3)
 
         self._refresh_list()
 
@@ -76,3 +87,25 @@ class ProfilesPanel(QWidget):
             return
         self._store.delete(name)
         self._refresh_list()
+
+    # --- import/export: testable path methods + box-only file dialogs ---
+    def import_path(self, path) -> None:
+        """Import a config from ``path`` and make it live (swap + configChanged)."""
+        cfg = import_config(path)
+        self._handle.swap(cfg)
+        self.configChanged.emit(cfg)
+
+    def export_path(self, path) -> None:
+        """Write the live config to ``path``."""
+        export_config(self._handle.current, path)
+
+    def _import_dialog(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(self, "Import config", "", "TOML (*.toml)")
+        if path:
+            self.import_path(path)
+
+    def _export_dialog(self) -> None:
+        path, _ = QFileDialog.getSaveFileName(self, "Export config", "ragnarok.toml",
+                                              "TOML (*.toml)")
+        if path:
+            self.export_path(path)
