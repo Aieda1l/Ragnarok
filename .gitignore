@@ -56,3 +56,6 @@ Thumbs.db
 
 # Subagent-driven-development scratch ledger
 .superpowers/
+
+# built TensorRT engines + ONNX (large, box-specific)
+engines/
