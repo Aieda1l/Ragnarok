@@ -39,11 +39,11 @@ def test_detect_empty_session_yields_no_detections():
 
 
 def test_factory_routes_trt_backend():
-    # The factory must select the TRT class for backend=rfdetr_trt. With no
-    # injected session the TRT detector calls _build_trt_session, which raises
-    # NotImplementedError — and that exception is reachable ONLY via the TRT
-    # route, so asserting it uniquely proves the routing (environment-independent;
-    # the torch route never raises NotImplementedError).
-    cfg = DetectionConfig(backend="rfdetr_trt", engine_path="missing.engine")
-    with pytest.raises(NotImplementedError):
+    # The factory must select the TRT class for backend=rfdetr_trt. With an empty
+    # engine_path the TRT session build raises a specific RuntimeError BEFORE any
+    # tensorrt import — reachable ONLY via the TRT route (the torch route never
+    # touches engine_path), so asserting it uniquely + environment-independently
+    # proves the routing.
+    cfg = DetectionConfig(backend="rfdetr_trt")        # engine_path="" default
+    with pytest.raises(RuntimeError, match="engine_path"):
         create_detector(cfg)
