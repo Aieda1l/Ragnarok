@@ -111,14 +111,14 @@ def fov_bracket_segments(center, half: float, arm: float):
         ((left, top), (left, bot)),      # left vertical
         ((right, top), (right, bot)),    # right vertical
     )
-    # bold arms flare OUTWARD and UP/DOWN from each vertical's ends (the top arm
-    # points up, the bottom arm points down) — they do NOT angle inward toward
-    # the aim point.
+    # short bold serifs at each vertical's ends: the top serif points UP, the
+    # bottom serif points DOWN, both angled toward the frame centre (like the
+    # CP2077 smart-link `[ ]` corner serifs).
     thick: tuple[_Seg, ...] = (
-        ((left, top), (left - arm, top - arm)),      # left-top   -> up & out (up-left)
-        ((left, bot), (left - arm, bot + arm)),      # left-bottom-> down & out (down-left)
-        ((right, top), (right + arm, top - arm)),    # right-top  -> up & out (up-right)
-        ((right, bot), (right + arm, bot + arm)),    # right-bottom-> down & out (down-right)
+        ((left, top), (left + arm, top - arm)),      # left-top   -> up & in (up-right)
+        ((left, bot), (left + arm, bot + arm)),      # left-bottom-> down & in (down-right)
+        ((right, top), (right - arm, top - arm)),    # right-top  -> up & in (up-left)
+        ((right, bot), (right - arm, bot + arm)),    # right-bottom-> down & in (down-left)
     )
     return thin, thick
 
@@ -177,7 +177,7 @@ def _ray_rect_edge(origin, target, viewport):
     return (ox + dx * best, oy + dy * best)
 
 
-def build_scene(*, snapshot, cfg, viewport, bracket_arm: float = 10.0) -> OverlayScene:
+def build_scene(*, snapshot, cfg, viewport, bracket_arm: float = 6.0) -> OverlayScene:
     """Assemble the full ``OverlayScene`` from a telemetry snapshot + config.
 
     Returns an empty (no-signal) scene when the snapshot has no ROI region.

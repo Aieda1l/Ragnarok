@@ -2,7 +2,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 import os
-from PySide6.QtWidgets import QApplication, QTabWidget
+from PySide6.QtWidgets import QApplication, QTabWidget, QScrollArea
 from ragnarok.config.store import load_config, save_config, ConfigHandle
 from ragnarok.capture.factory import create_capturer
 from ragnarok.detection.factory import create_detector
@@ -150,35 +150,44 @@ def main() -> int:
             import warnings
             warnings.warn(f"config reload failed (keeping previous worker components): {exc}")
 
+    def _scroll(widget):
+        # keep the window compact: overflowing options scroll instead of
+        # stretching the window taller.
+        area = QScrollArea()
+        area.setWidgetResizable(True)
+        area.setWidget(widget)
+        return area
+
     tabs = QTabWidget()
     dashboard = DashboardPanel(publisher)
-    tabs.addTab(dashboard, "Dashboard")
-    aim_panel = TuningPanel(handle, on_save=_save)
+    tabs.addTab(_scroll(dashboard), "Dashboard")
+    aim_panel = TuningPanel(handle, on_save=_save, title="Aim")
     aim_panel.configChanged.connect(_on_config_changed)
     tuning_panels.append(aim_panel)
-    tabs.addTab(aim_panel, "Aim")
+    tabs.addTab(_scroll(aim_panel), "Aim")
     diagnostics = DiagnosticsPanel(handle)
     diagnostics.configChanged.connect(_on_config_changed)
-    tabs.addTab(diagnostics, "Diagnostics")
+    tabs.addTab(_scroll(diagnostics), "Diagnostics")
     for fields, title in ((TRACKING_FIELDS, "Tracking"),
                           (CLASSIFICATION_FIELDS, "Friend/Foe"),
                           (TRIGGER_FIELDS, "Trigger"),
                           (RECOIL_FIELDS, "Recoil"),
                           (MOTION_FIELDS, "Motion"),
                           (INPUT_FIELDS, "Input")):
-        p = TuningPanel(handle, fields=fields, on_save=_save)
+        p = TuningPanel(handle, fields=fields, on_save=_save, title=title)
         p.configChanged.connect(_on_config_changed)
         tuning_panels.append(p)
-        tabs.addTab(p, title)
+        tabs.addTab(_scroll(p), title)
     profiles = ProfilesPanel(ProfileStore(_profiles_dir()), handle)
     profiles.configChanged.connect(_on_config_changed)
-    tabs.addTab(profiles, "Profiles")
+    tabs.addTab(_scroll(profiles), "Profiles")
     wizards = CalibrationPanel(handle)
     wizards.configChanged.connect(_on_config_changed)
-    tabs.addTab(wizards, "Wizards")
+    tabs.addTab(_scroll(wizards), "Wizards")
 
     worker = WorkerThread(loop)
     window = MainWindow(publisher, controls=ChromeFrame(tabs))   # Cyberpunk panel chrome
+    window.resize(780, 820)                                       # compact; tabs scroll
     window.show()
     # Smart-lock FOV overlay: frameless/click-through, own timer, read-only.
     # Reads the LIVE config so FOV-ring / aim-point edits show immediately.
