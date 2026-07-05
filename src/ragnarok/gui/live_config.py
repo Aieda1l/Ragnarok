@@ -18,7 +18,9 @@ class AimReloader:
         self._buf = commanded_buffer
 
     def reload(self, cfg) -> None:
-        if cfg.aim.enabled:
+        # The builder returns an AimController (aim on), a standalone
+        # TriggerController (aim off, trigger on), or None (neither).
+        if cfg.aim.enabled or cfg.trigger.enabled:
             self._loop.set_aim_controller(self._build(cfg, self._buf))
         else:
             self._loop.set_aim_controller(None)

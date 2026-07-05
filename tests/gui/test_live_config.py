@@ -35,6 +35,20 @@ def test_reload_disables_without_building_when_aim_off():
     assert called["n"] == 0                          # no rebuild when disabled
 
 
+def test_reload_builds_standalone_trigger_when_aim_off_trigger_on():
+    loop = _Loop()
+    called = {"n": 0}
+    def build(cfg, buf):
+        called["n"] += 1
+        return "TRIG"
+    r = AimReloader(loop, build)
+    base = AppConfig()
+    cfg = base.model_copy(update={"trigger": base.trigger.model_copy(update={"enabled": True})})
+    r.reload(cfg)                                    # aim off + trigger on -> build standalone
+    assert loop.controller == "TRIG"
+    assert called["n"] == 1
+
+
 from ragnarok.gui.live_config import WorkerReloader
 
 
