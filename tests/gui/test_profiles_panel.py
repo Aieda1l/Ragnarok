@@ -50,3 +50,19 @@ def test_save_as_blank_name_is_noop(qtbot, tmp_path):
     panel.name_edit.setText("   ")
     panel._save_as()
     assert store.list() == []
+
+
+def test_export_then_import_path_roundtrips_and_emits(qtbot, tmp_path):
+    cfg = AppConfig().model_copy(update={"aim": AppConfig().aim.model_copy(update={"kp": 0.7})})
+    panel, store, handle = _panel(tmp_path, cfg)
+    qtbot.addWidget(panel)
+    dst = tmp_path / "export.toml"
+    panel.export_path(dst)                         # export live config
+    assert dst.exists()
+
+    panel2, _, handle2 = _panel(tmp_path)          # fresh panel with default config
+    qtbot.addWidget(panel2)
+    with qtbot.waitSignal(panel2.configChanged, timeout=1000) as blocker:
+        panel2.import_path(dst)                    # import -> swaps + emits
+    assert handle2.current.aim.kp == 0.7
+    assert blocker.args[0].aim.kp == 0.7
