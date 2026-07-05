@@ -55,6 +55,13 @@ def build_stylesheet() -> str:
         font-size: 13px;
     }}
     QMainWindow, QDialog {{ background: {BG}; }}
+    /* frameless window border + custom title bar */
+    QWidget#root {{ background: {BG}; border: 1px solid {RED}; }}
+    QLabel#titlebar {{ color: {CYAN}; font-weight: bold; font-size: 14px;
+                       letter-spacing: 3px; }}
+    QPushButton#titleclose {{ color: {RED}; border: none; background: transparent;
+                              font-size: 14px; }}
+    QPushButton#titleclose:hover {{ background: {RED}; color: {BG}; }}
     QLabel {{ background: transparent; color: {LABEL}; }}
     QLabel#mono {{ font-family: {MONO_STACK}; color: {CYAN}; }}
     /* section header — light, bold, with a cyan underline divider */

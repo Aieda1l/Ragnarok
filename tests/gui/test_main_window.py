@@ -25,3 +25,11 @@ def test_main_window_embeds_controls_widget(qtbot):
     qtbot.addWidget(win)
     assert win.controls is panel
     assert panel.parent() is not None                # actually parented into the window
+
+
+def test_main_window_is_frameless_with_titlebar(qtbot):
+    from PySide6.QtCore import Qt
+    win = MainWindow(SnapshotPublisher())
+    qtbot.addWidget(win)
+    assert win.windowFlags() & Qt.FramelessWindowHint
+    assert win.title_bar.title_label.text() == "RAGNAROK"
