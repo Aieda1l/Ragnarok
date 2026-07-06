@@ -74,7 +74,7 @@ def build_aimer(cfg: AppConfig):
     return FeedbackAimer(
         kp=a.kp, max_step_px=a.max_step_px, ema_alpha=a.ema_alpha, kff=a.kff,
         ki=ki, kd=kd, integral_clamp=a.integral_clamp,
-        cond_integ_thresh_px=a.cond_integ_thresh_px,
+        cond_integ_thresh_px=a.cond_integ_thresh_px, creep_px=a.creep_px,
     )
 
 
