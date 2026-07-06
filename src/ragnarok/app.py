@@ -16,7 +16,7 @@ from ragnarok.gui.overlay_window import FovOverlay
 from ragnarok.gui.tuning_panel import TuningPanel
 from ragnarok.gui.tuning_model import (
     TRACKING_FIELDS, CLASSIFICATION_FIELDS, TRIGGER_FIELDS, MOTION_FIELDS,
-    INPUT_FIELDS)
+    INPUT_FIELDS, DETECTION_FIELDS, OVERLAY_FIELDS, KEYBIND_FIELDS)
 from ragnarok.gui.diagnostics_panel import DiagnosticsPanel
 from ragnarok.gui.profiles_panel import ProfilesPanel
 from ragnarok.gui.calibration_panel import CalibrationPanel
@@ -38,7 +38,7 @@ def _build_mouse(cfg):
     from ragnarok.aim.mouse import SendInputMouseDriver
 
     def _sendinput():
-        m = SendInputMouseDriver()
+        m = SendInputMouseDriver(compensate_ballistics=cfg.input.compensate_ballistics)
         m.connect()
         return m
 
@@ -112,7 +112,8 @@ def _build_aim_controller(cfg, commanded_buffer):
     retain_px = fov_deg_to_radius_px(a.retain_fov_deg, a.hfov_deg, a.screen_width_px)
     selector = TargetSelector(fov_px=fov_px, retain_fov_px=retain_px,
                               dwell_ms=a.dwell_ms, switch_margin=a.switch_margin,
-                              head_frac=a.head_frac)
+                              head_frac=a.head_frac,
+                              head_class_id=a.head_class_id if a.aim_point == "detected_head" else None)
     mouse = _build_mouse(cfg)
     is_active = make_aim_active(AsyncKeyStateProvider(a.aim_key), toggle=a.toggle)
     trigger, trigger_active = _build_trigger_bot(cfg, mouse)
@@ -204,10 +205,13 @@ def main() -> int:
     diagnostics = DiagnosticsPanel(handle)
     diagnostics.configChanged.connect(_on_config_changed)
     tabs.addTab(_scroll(diagnostics), "Diagnostics")
-    for fields, title in ((TRACKING_FIELDS, "Tracking"),
+    for fields, title in ((DETECTION_FIELDS, "Detection"),
+                          (TRACKING_FIELDS, "Tracking"),
                           (CLASSIFICATION_FIELDS, "Friend/Foe"),
                           (TRIGGER_FIELDS, "Trigger"),
                           (MOTION_FIELDS, "Motion"),
+                          (KEYBIND_FIELDS, "Keybinds"),
+                          (OVERLAY_FIELDS, "Overlay"),
                           (INPUT_FIELDS, "Input")):
         p = TuningPanel(handle, fields=fields, on_save=_save, title=title)
         p.configChanged.connect(_on_config_changed)
