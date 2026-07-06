@@ -8,7 +8,7 @@ is box-only and runs only while this tab is visible.
 """
 from __future__ import annotations
 
-from PySide6.QtCore import Signal, QAbstractNativeEventFilter
+from PySide6.QtCore import Signal, QAbstractNativeEventFilter, QTimer
 from PySide6.QtWidgets import QApplication, QLabel, QPushButton, QVBoxLayout, QWidget
 
 from ragnarok.gui.calibration_model import apply_sensitivity
@@ -31,21 +31,34 @@ class _RawMouseFilter(QAbstractNativeEventFilter):
 class CountsCalibratePanel(QWidget):
     configChanged = Signal(object)
 
-    def __init__(self, handle) -> None:
+    def __init__(self, handle, *, reset_provider=None, apply_provider=None) -> None:
         super().__init__()
         self._handle = handle
         self._x = 0
         self._y = 0
         self._filter = _RawMouseFilter(self._on_counts)
         self._installed = False
+        # Global hotkeys (polled) so the whole 360° can be done in-game without
+        # GUI->game mouse travel skewing the count. Providers injectable for tests.
+        cal = handle.current.calibration
+        self._reset_prov = reset_provider
+        self._apply_prov = apply_provider
+        self._reset_key = cal.reset_key
+        self._apply_key = cal.apply_key
+        self._reset_was = False
+        self._apply_was = False
+        self._key_timer = QTimer(self)
+        self._key_timer.setInterval(30)
+        self._key_timer.timeout.connect(self._poll_keys)
 
         root = QVBoxLayout(self)
         header = QLabel("SENSITIVITY CALIBRATION")
         header.setObjectName("header")
         root.addWidget(header)
         root.addWidget(QLabel(
-            "1. Reset.   2. Do exactly ONE full 360° horizontal turn in-game.   "
-            "3. Set sensitivity."))
+            f"1. Reset ({cal.reset_key}).   2. One full 360° horizontal turn in-game.   "
+            f"3. Set sensitivity ({cal.apply_key}).   Use the hotkeys IN-GAME so GUI "
+            "mouse travel isn't counted."))
         self.counts = QLabel("X: 0    Y: 0   counts")
         self.counts.setObjectName("mono")
         root.addWidget(self.counts)
@@ -70,6 +83,19 @@ class CountsCalibratePanel(QWidget):
         self.counts.setText("X: 0    Y: 0   counts")
         self.result.setText("")
 
+    def _poll_keys(self) -> None:
+        """Rising-edge fire of the reset / apply hotkeys (testable; providers injected)."""
+        if self._reset_prov is not None:
+            down = self._reset_prov.is_down()
+            if down and not self._reset_was:
+                self.reset()
+            self._reset_was = down
+        if self._apply_prov is not None:
+            down = self._apply_prov.is_down()
+            if down and not self._apply_was:
+                self._apply_360()
+            self._apply_was = down
+
     def _apply_360(self) -> None:
         try:
             new = apply_sensitivity(self._handle, total_counts=float(self._x),
@@ -91,9 +117,21 @@ class CountsCalibratePanel(QWidget):
             self._installed = True
         except Exception:
             pass
+        if self._reset_prov is None or self._apply_prov is None:
+            try:
+                from ragnarok.aim.keys import AsyncKeyStateProvider
+                if self._reset_prov is None:
+                    self._reset_prov = AsyncKeyStateProvider(self._reset_key)
+                if self._apply_prov is None:
+                    self._apply_prov = AsyncKeyStateProvider(self._apply_key)
+            except Exception:
+                pass                              # unknown key / non-Windows -> hotkeys off
+        self._reset_was = self._apply_was = False
+        self._key_timer.start()
 
     def hideEvent(self, event) -> None:  # pragma: no cover — box-only
         super().hideEvent(event)
+        self._key_timer.stop()
         if self._installed:
             try:
                 QApplication.instance().removeNativeEventFilter(self._filter)
