@@ -37,8 +37,14 @@ class RecoilPanel(QWidget):
         self.scale.setMaximum(5.0)
         self.scale.setSingleStep(0.1)
         self.scale.setValue(float(r.scale))
+        self.fire_rate = CyberSlider()
+        self.fire_rate.setMinimum(0.0)
+        self.fire_rate.setMaximum(30.0)
+        self.fire_rate.setSingleStep(0.5)
+        self.fire_rate.setValue(float(r.fire_rate_rps))
         form.addRow("Recoil comp enabled", self.enabled)
         form.addRow("Recoil scale", self.scale)
+        form.addRow("Fire rate (rps, 0=semi)", self.fire_rate)
         root.addLayout(form)
 
         root.addWidget(QLabel(
@@ -53,5 +59,6 @@ class RecoilPanel(QWidget):
     def _apply(self) -> None:
         points = parse_pattern_text(self.pattern_edit.toPlainText())
         new_cfg = apply_recoil(self._handle, points, scale=self.scale.value(),
-                               enabled=self.enabled.isChecked())
+                               enabled=self.enabled.isChecked(),
+                               fire_rate_rps=self.fire_rate.value())
         self.configChanged.emit(new_cfg)

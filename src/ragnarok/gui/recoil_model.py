@@ -25,13 +25,16 @@ def parse_pattern_text(text: str) -> tuple[tuple[float, float], ...]:
     return tuple(pts)
 
 
-def apply_recoil(handle, points, *, scale: float, enabled: bool):
-    """Set recoil.pattern/scale/enabled on a NEW re-validated AppConfig and swap."""
+def apply_recoil(handle, points, *, scale: float, enabled: bool,
+                 fire_rate_rps: float = 0.0):
+    """Set recoil.pattern/scale/enabled/fire_rate_rps on a NEW re-validated
+    AppConfig and swap."""
     cfg = handle.current
     new_recoil = cfg.recoil.__class__(**{**cfg.recoil.model_dump(),
                                          "pattern": tuple(points),
                                          "scale": float(scale),
-                                         "enabled": bool(enabled)})
+                                         "enabled": bool(enabled),
+                                         "fire_rate_rps": float(fire_rate_rps)})
     new_cfg = cfg.model_copy(update={"recoil": new_recoil})
     handle.swap(new_cfg)
     return new_cfg
