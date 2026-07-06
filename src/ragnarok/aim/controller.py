@@ -18,6 +18,12 @@ from ragnarok.aim.head import resolve_aim_point
 from ragnarok.motion.shaper import NullShaper
 
 
+def _clamp_between(a: float, b: float, v: float) -> float:
+    """Clamp v to the closed interval [min(a,b), max(a,b)]."""
+    lo, hi = (a, b) if a <= b else (b, a)
+    return max(lo, min(hi, v))
+
+
 class AimController:
     def __init__(
         self,
@@ -48,6 +54,7 @@ class AimController:
         self._cx = roi_size / 2.0
         self._cy = roi_size / 2.0
         self._deg_per_px = cfg.hfov_deg / float(cfg.screen_width_px)
+        self._deadtime_ns = round(float(getattr(cfg, "deadtime_ms", 0.0)) * 1e6)
         self._clock = clock
         self._shaper = shaper if shaper is not None else NullShaper()
         self._vel = vel_smoother
@@ -107,7 +114,23 @@ class AimController:
                 vx, vy = self._vel.smooth_clamp(vx, vy)
             tvx, tvy = vx, vy
 
-        dpx, dpy = self._aimer.step((self._cx, self._cy), lead_pt, dt, target_vel=(tvx, tvy))
+        # Smith predictor / dead-time compensation: the aim path is a feedback
+        # loop with a large round-trip delay (send -> game render -> display ->
+        # capture -> detect -> track = tens of ms / several ticks). Advance the
+        # crosshair by the counts already commanded but NOT yet visible in this
+        # detection, so we don't re-issue a full correction every tick for moves
+        # still in flight (that stacking is what makes every aimer overshoot and
+        # rubber-band). Clamped so an over-estimated deadtime can't push the
+        # crosshair past the target (never reverses the aim).
+        chx, chy = self._cx, self._cy
+        if self._cmd_buf is not None and self._deadtime_ns > 0 and self._deg_per_px > 0.0:
+            now = self._clock()
+            ccx, ccy = self._cmd_buf.integrate(now - self._deadtime_ns, now)
+            inv_k = self._cfg.sensitivity / self._deg_per_px          # counts -> px
+            chx = _clamp_between(self._cx, lead_pt[0], self._cx + ccx * inv_k)
+            chy = _clamp_between(self._cy, lead_pt[1], self._cy + ccy * inv_k)
+
+        dpx, dpy = self._aimer.step((chx, chy), lead_pt, dt, target_vel=(tvx, tvy))
         sx, sy = self._shaper.shape(dpx, dpy)
 
         # trigger + recoil
