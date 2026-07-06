@@ -60,6 +60,7 @@ def select_target(
     current_target_id: int | None = None,
     retain_fov_px: float | None = None,
     switch_margin: float = 0.0,
+    head_class_id: int | None = None,
 ) -> int | None:
     """Select the best ENEMY ``track_id`` within *fov_px* of *crosshair*.
 
@@ -92,12 +93,24 @@ def select_target(
     """
     retain = retain_fov_px if retain_fov_px is not None else fov_px
 
+    # A head-class detection that sits inside an ENEMY body box refines that
+    # target's aim point (via head-aware aiming) — it must NOT compete as its own
+    # candidate, or the lock oscillates between the body and its head each frame.
+    body_boxes = ([t.xyxy for t in tracks
+                   if t.team is Team.ENEMY and t.class_id != head_class_id]
+                  if head_class_id is not None else [])
+
     candidates: list[tuple[float, int]] = []   # (cost, track_id)
     cur_cost: float | None = None
 
     for tr in tracks:
         if tr.team is not Team.ENEMY:
             continue  # safety contract: ENEMY only
+        if head_class_id is not None and tr.class_id == head_class_id:
+            hcx, hcy = tr.center
+            if any(bx1 <= hcx <= bx2 and by1 <= hcy <= by2
+                   for (bx1, by1, bx2, by2) in body_boxes):
+                continue  # head enclosed by a body -> refines it, not a rival target
         d = dist_to(crosshair, aim_point(tr, head_frac))
         # Check if this track is the current lock and inside the retain radius
         if tr.track_id == current_target_id and d <= retain:
@@ -187,6 +200,7 @@ class TargetSelector:
         dwell_ms: float = 120.0,
         switch_margin: float = 0.20,
         head_frac: float = 0.15,
+        head_class_id: int | None = None,
         clock=now_ns,
     ) -> None:
         self._fov = fov_px
@@ -194,6 +208,7 @@ class TargetSelector:
         self._dwell_ns = int(dwell_ms * 1_000_000)  # ms → ns
         self._margin = switch_margin
         self._head = head_frac
+        self._head_class_id = head_class_id
         self._clock = clock
         self._lk = _LockState()
 
@@ -245,6 +260,7 @@ class TargetSelector:
             current_target_id=self._lk.target_id,
             retain_fov_px=self._retain,
             switch_margin=self._margin,
+            head_class_id=self._head_class_id,
         )
 
         now = self._clock()
