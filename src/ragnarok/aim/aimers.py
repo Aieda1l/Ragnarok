@@ -139,7 +139,8 @@ class FeedbackAimer(Aimer):
     def __init__(self, *, kp: float, max_step_px: float, ema_alpha: float = 1.0,
                  kff: float = 0.0, ki: float = 0.0, kd: float = 0.0,
                  integral_clamp: float | None = None,
-                 cond_integ_thresh_px: float | None = None) -> None:
+                 cond_integ_thresh_px: float | None = None,
+                 creep_px: float = 0.0) -> None:
         self._kp = kp
         self._max = max_step_px
         self._alpha = ema_alpha
@@ -148,18 +149,23 @@ class FeedbackAimer(Aimer):
         self._kd = kd
         self._iclamp = integral_clamp
         self._cond = cond_integ_thresh_px
+        self._creep = creep_px          # >0: quadratic creep zone (NeuralBot-style)
         self._fx = 0.0
         self._fy = 0.0
         self._ix = 0.0
         self._iy = 0.0
         self._prev_fx = 0.0
         self._prev_fy = 0.0
+        self._prev_ex = 0.0             # raw error, for sign-flip anti-windup
+        self._prev_ey = 0.0
         self._initialized = False
 
     def reset(self) -> None:
         self._initialized = False
         self._ix = 0.0
         self._iy = 0.0
+        self._prev_ex = 0.0
+        self._prev_ey = 0.0
 
     def step(
         self,
@@ -170,6 +176,14 @@ class FeedbackAimer(Aimer):
     ) -> tuple[float, float]:
         ex = target_point[0] - crosshair[0]
         ey = target_point[1] - crosshair[1]
+
+        # Sign-flip anti-windup (NeuralBot): reversing past the target zeroes the
+        # integrator so it doesn't carry overshoot momentum back through.
+        if ex * self._prev_ex < 0.0:
+            self._ix = 0.0
+        if ey * self._prev_ey < 0.0:
+            self._iy = 0.0
+        self._prev_ex, self._prev_ey = ex, ey
 
         if not self._initialized:
             self._fx, self._fy = ex, ey
@@ -215,6 +229,13 @@ class FeedbackAimer(Aimer):
             # Freeze-on-saturation (anti-windup #3): undo this step's integration.
             self._ix -= inc_x
             self._iy -= inc_y
+
+        # Quadratic creep zone (NeuralBot): within creep_px of the target, ease
+        # the per-axis move to zero (scale by (e/creep)^2) so the crosshair settles
+        # onto the target instead of ringing around it.
+        if self._creep > 0.0:
+            dx *= min(1.0, (ex / self._creep) ** 2)
+            dy *= min(1.0, (ey / self._creep) ** 2)
 
         return (dx, dy)
 

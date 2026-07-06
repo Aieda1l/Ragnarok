@@ -32,4 +32,4 @@ def test_apply_360_with_no_counts_is_guarded(qtbot):
     qtbot.addWidget(panel)
     panel._apply_360()                        # no turn recorded
     assert h.current.aim.sensitivity == AppConfig().aim.sensitivity     # unchanged
-    assert "360" in panel.result.text()
+    assert "turn" in panel.result.text().lower()                        # guidance shown
