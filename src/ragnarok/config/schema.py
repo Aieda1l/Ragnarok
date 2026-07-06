@@ -105,6 +105,9 @@ class RecoilConfig(BaseModel):
     enabled: bool = False
     scale: float = Field(default=1.0, ge=0.0)
     pattern: tuple[tuple[float, float], ...] = ()
+    # Full-auto: rounds/sec to advance the spray pattern while the trigger is HELD.
+    # 0 = semi-auto (advance one shot per new trigger press only).
+    fire_rate_rps: float = Field(default=0.0, ge=0.0, le=60.0)
 
 
 class TriggerConfig(BaseModel):
