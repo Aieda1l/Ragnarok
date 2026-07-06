@@ -38,6 +38,11 @@ class AimConfig(BaseModel):
     kp: float = Field(default=0.35, gt=0.0, le=2.0)
     max_step_px: float = Field(default=60.0, gt=0.0)
     creep_px: float = Field(default=8.0, ge=0.0)   # feedback quadratic creep zone (0=off)
+    # Smith-predictor dead-time: the aim feedback loop's round-trip latency
+    # (send->render->display->capture->detect). The controller advances the
+    # crosshair by counts commanded within this window so it doesn't re-issue
+    # corrections for moves not yet visible (0 = off -> stacks -> overshoot).
+    deadtime_ms: float = Field(default=40.0, ge=0.0, le=500.0)
     flick_speed_px_s: float = Field(default=4000.0, gt=0.0)
     ema_alpha: float = Field(default=0.5, gt=0.0, le=1.0)
     aim_point: Literal["head", "body", "detected_head"] = "head"
