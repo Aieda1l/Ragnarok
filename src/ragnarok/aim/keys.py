@@ -27,6 +27,12 @@ VK: dict[str, int] = {
     "VK_CAPITAL":  0x14,
     "VK_ESCAPE":   0x1B,
     "VK_SPACE":    0x20,
+    "VK_PRIOR":    0x21,   # Page Up
+    "VK_NEXT":     0x22,   # Page Down
+    "VK_END":      0x23,
+    "VK_HOME":     0x24,
+    "VK_INSERT":   0x2D,
+    "VK_DELETE":   0x2E,
     "VK_F1":       0x70,
     "VK_F2":       0x71,
     "VK_F3":       0x72,
