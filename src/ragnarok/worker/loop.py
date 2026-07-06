@@ -73,6 +73,14 @@ class WorkerLoop:
             aim.update(tracks, frame.t_capture_ns)
         t_aim = now_ns()
 
+        # Dynamic-ROI feedback: tell the detector where the locked target is so the
+        # NEXT frame can crop+upscale around it (no-op for the plain detector).
+        if hasattr(self._det, "observe_lock"):
+            tid = getattr(aim, "target_id", None) if aim is not None else None
+            locked = next((t for t in tracks if t.track_id == tid), None) if tid is not None else None
+            self._det.observe_lock(locked.center if locked is not None else None,
+                                   locked is not None)
+
         self._profiler.record("capture", t_cap - t0)
         self._profiler.record("infer", t_inf - t_cap)
         self._profiler.record("track", t_trk - t_inf)
