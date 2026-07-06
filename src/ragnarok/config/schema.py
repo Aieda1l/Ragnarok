@@ -161,6 +161,14 @@ class InputConfig(BaseModel):
     compensate_ballistics: bool = False
 
 
+class CalibrationConfig(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    # Hotkeys for the Calibrate tab so a 360° turn can be measured entirely
+    # in-game (no GUI->game mouse travel corrupting the count).
+    reset_key: str = "VK_HOME"                    # zero the raw-count total
+    apply_key: str = "VK_END"                     # set sensitivity from the count
+
+
 class OverlayConfig(BaseModel):
     model_config = ConfigDict(frozen=True)
     show_confidence: bool = True                 # draw the detection score by each marker
@@ -194,4 +202,5 @@ class AppConfig(BaseModel):
     arduino: ArduinoConfig = ArduinoConfig()
     input: InputConfig = InputConfig()
     overlay: OverlayConfig = OverlayConfig()
+    calibration: CalibrationConfig = CalibrationConfig()
     dynamic_roi: DynamicRoiConfig = DynamicRoiConfig()

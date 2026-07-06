@@ -135,6 +135,8 @@ KEYBIND_FIELDS: tuple[FieldSpec, ...] = (
     FieldSpec("aim.aim_key", "Aim key (VK_ or char)", "text"),
     FieldSpec("aim.toggle", "Aim = toggle (off = hold)", "bool"),
     FieldSpec("trigger.trigger_key", "Trigger key (VK_ or char)", "text"),
+    FieldSpec("calibration.reset_key", "Calib reset key (VK_)", "text"),
+    FieldSpec("calibration.apply_key", "Calib set-sens key (VK_)", "text"),
 )
 
 
