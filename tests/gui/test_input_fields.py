@@ -6,7 +6,7 @@ def test_input_fields_wellformed_and_target_input_or_arduino():
     assert len(INPUT_FIELDS) >= 3
     for f in INPUT_FIELDS:
         assert f.path.startswith("input.") or f.path.startswith("arduino.")
-        assert f.kind in {"text", "int", "choice"}
+        assert f.kind in {"text", "int", "choice", "bool"}
 
 
 def test_input_fields_set_roundtrip_including_text():

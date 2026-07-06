@@ -110,12 +110,31 @@ MOTION_FIELDS: tuple[FieldSpec, ...] = (
 INPUT_FIELDS: tuple[FieldSpec, ...] = (
     FieldSpec("input.mouse_driver", "Mouse driver", "choice",
               choices=("sendinput", "arduino")),
+    FieldSpec("input.compensate_ballistics", "Compensate ptr ballistics", "bool"),
     FieldSpec("arduino.transport", "Arduino transport", "choice",
               choices=("serial", "udp")),
     FieldSpec("arduino.port", "Serial port (COM/tty)", "text"),
     FieldSpec("arduino.baud", "Baud", "int", 1200, 2000000, 100),
     FieldSpec("arduino.host", "UDP host", "text"),
     FieldSpec("arduino.udp_port", "UDP port", "int", 0, 65535, 1),
+)
+
+DETECTION_FIELDS: tuple[FieldSpec, ...] = (
+    FieldSpec("detection.confidence", "Confidence threshold", "float", 0.0, 1.0, 0.01),
+)
+
+OVERLAY_FIELDS: tuple[FieldSpec, ...] = (
+    FieldSpec("overlay.show_confidence", "Show confidence", "bool"),
+    FieldSpec("overlay.show_fov", "Show FOV brackets", "bool"),
+    FieldSpec("overlay.show_boxes", "Show non-enemy boxes", "bool"),
+    FieldSpec("overlay.show_tracking_line", "Show tracking line", "bool"),
+    FieldSpec("overlay.diamond_scale", "Diamond size", "float", 0.2, 5.0, 0.1),
+)
+
+KEYBIND_FIELDS: tuple[FieldSpec, ...] = (
+    FieldSpec("aim.aim_key", "Aim key (VK_ or char)", "text"),
+    FieldSpec("aim.toggle", "Aim = toggle (off = hold)", "bool"),
+    FieldSpec("trigger.trigger_key", "Trigger key (VK_ or char)", "text"),
 )
 
 

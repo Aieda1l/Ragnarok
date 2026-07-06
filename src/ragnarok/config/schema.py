@@ -155,6 +155,19 @@ class ArduinoConfig(BaseModel):
 class InputConfig(BaseModel):
     model_config = ConfigDict(frozen=True)
     mouse_driver: Literal["sendinput", "arduino"] = "sendinput"
+    # Compensate for the Windows pointer-speed slider on SendInput moves. Leave
+    # OFF for games that read RAW input (most FPS) — they bypass pointer
+    # ballistics, so compensating would over-move. ON only for cursor-driven games.
+    compensate_ballistics: bool = False
+
+
+class OverlayConfig(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    show_confidence: bool = True                 # draw the detection score by each marker
+    show_fov: bool = True                        # draw the FOV brackets
+    show_boxes: bool = True                       # draw teammate/unknown do-not-shoot boxes
+    show_tracking_line: bool = True              # dashed crosshair -> locked-target line
+    diamond_scale: float = Field(default=1.0, gt=0.0, le=5.0)
 
 
 class DynamicRoiConfig(BaseModel):
@@ -180,4 +193,5 @@ class AppConfig(BaseModel):
     training: TrainingConfig = TrainingConfig()
     arduino: ArduinoConfig = ArduinoConfig()
     input: InputConfig = InputConfig()
+    overlay: OverlayConfig = OverlayConfig()
     dynamic_roi: DynamicRoiConfig = DynamicRoiConfig()

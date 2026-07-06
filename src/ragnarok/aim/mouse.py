@@ -119,11 +119,13 @@ except Exception:  # pragma: no cover — non-Windows with no wintypes
 # Real SendInput callable (the only injectable side effect)
 # ---------------------------------------------------------------------------
 
-def _make_real_send() -> Callable[[int, int, int], int]:
+def _make_real_send(*, compensate_ballistics: bool = False) -> Callable[[int, int, int], int]:
     """Bind user32.SendInput and return a (dx, dy, flags) -> int callable.
 
     Called lazily inside connect() so importing the module on CI never
-    touches user32.dll.
+    touches user32.dll. ``compensate_ballistics`` pre-divides relative MOVE
+    deltas by the Windows pointer-speed multiplier — correct ONLY for
+    cursor-driven games; raw-input games (most FPS) must leave it off.
     """
     if not _STRUCTS_AVAILABLE:
         raise RuntimeError(  # pragma: no cover
@@ -131,22 +133,23 @@ def _make_real_send() -> Callable[[int, int, int], int]:
         )
     user32 = ctypes.WinDLL("user32", use_last_error=True)  # type: ignore[attr-defined]
 
-    # Pre-compensate Windows pointer ballistics so N commanded counts move N px.
-    # SPI_GETMOUSESPEED (0x70) -> 1..20 slider; SPI_GETMOUSE (0x03)[2] -> EPP flag.
-    SPI_GETMOUSE, SPI_GETMOUSESPEED = 0x0003, 0x0070
-    speed = ctypes.c_int()
-    user32.SystemParametersInfoA(SPI_GETMOUSESPEED, 0, ctypes.byref(speed), 0)
-    accel = (ctypes.c_int * 3)()
-    user32.SystemParametersInfoA(SPI_GETMOUSE, 0, ctypes.byref(accel), 0)
-    if accel[2]:  # "Enhance pointer precision" — non-linear, cannot invert cleanly
-        import warnings
-        warnings.warn(
-            "Windows 'Enhance pointer precision' is ON: SendInput moves are "
-            "accelerated non-linearly and cannot be fully compensated. Disable it "
-            "(Settings > Mouse) or use the Arduino driver for accurate aim.",
-            stacklevel=2,
-        )
-    inv = 1.0 / pointer_speed_multiplier(speed.value)
+    inv = 1.0
+    if compensate_ballistics:
+        # SPI_GETMOUSESPEED (0x70) -> 1..20 slider; SPI_GETMOUSE (0x03)[2] -> EPP.
+        SPI_GETMOUSE, SPI_GETMOUSESPEED = 0x0003, 0x0070
+        speed = ctypes.c_int()
+        user32.SystemParametersInfoA(SPI_GETMOUSESPEED, 0, ctypes.byref(speed), 0)
+        accel = (ctypes.c_int * 3)()
+        user32.SystemParametersInfoA(SPI_GETMOUSE, 0, ctypes.byref(accel), 0)
+        if accel[2]:  # "Enhance pointer precision" — non-linear, cannot invert
+            import warnings
+            warnings.warn(
+                "Windows 'Enhance pointer precision' is ON: SendInput moves are "
+                "accelerated non-linearly and cannot be fully compensated. Disable "
+                "it (Settings > Mouse) or use the Arduino driver for accurate aim.",
+                stacklevel=2,
+            )
+        inv = 1.0 / pointer_speed_multiplier(speed.value)
 
     fn = user32.SendInput
     fn.argtypes = (wintypes.UINT, ctypes.POINTER(INPUT), ctypes.c_int)
@@ -264,18 +267,20 @@ class SendInputMouseDriver(MouseDriver):
         *,
         send: Optional[Callable[[int, int, int], int]] = None,
         max_px_per_tick: int = 32767,
+        compensate_ballistics: bool = False,
     ) -> None:
         self._send_injectable = send   # may be None (real) or a fake
         self._acc = _FracAccumulator()
         self._max = max_px_per_tick
+        self._compensate = compensate_ballistics
         self._connected = False
         self._send: Callable[[int, int, int], int]  # set in connect()
 
     def connect(self) -> None:
         if self._send_injectable is not None:
             self._send = self._send_injectable
-        else:
-            self._send = _make_real_send()  # lazy — CI never hits this branch
+        else:  # lazy — CI never hits this branch
+            self._send = _make_real_send(compensate_ballistics=self._compensate)
         self._acc.reset()
         self._connected = True
 
