@@ -9,7 +9,8 @@ is box-only and runs only while this tab is visible.
 from __future__ import annotations
 
 from PySide6.QtCore import Signal, QAbstractNativeEventFilter, QTimer
-from PySide6.QtWidgets import QApplication, QLabel, QPushButton, QVBoxLayout, QWidget
+from PySide6.QtWidgets import (
+    QApplication, QDoubleSpinBox, QFormLayout, QLabel, QPushButton, QVBoxLayout, QWidget)
 
 from ragnarok.gui.calibration_model import apply_sensitivity
 from ragnarok.gui import raw_mouse
@@ -56,17 +57,25 @@ class CountsCalibratePanel(QWidget):
         header.setObjectName("header")
         root.addWidget(header)
         root.addWidget(QLabel(
-            f"1. Reset ({cal.reset_key}).   2. One full 360° horizontal turn in-game.   "
-            f"3. Set sensitivity ({cal.apply_key}).   Use the hotkeys IN-GAME so GUI "
-            "mouse travel isn't counted."))
+            f"1. Reset ({cal.reset_key}).   2. Do a known horizontal turn in-game "
+            f"(360° default).   3. Set sensitivity ({cal.apply_key}).   Use the hotkeys "
+            "IN-GAME so GUI mouse travel isn't counted."))
         self.counts = QLabel("X: 0    Y: 0   counts")
         self.counts.setObjectName("mono")
         root.addWidget(self.counts)
 
+        form = QFormLayout()
+        self.degrees = QDoubleSpinBox()         # the turn's angle (360 = full spin)
+        self.degrees.setRange(1.0, 3600.0)
+        self.degrees.setDecimals(1)
+        self.degrees.setValue(360.0)
+        form.addRow("Turn degrees", self.degrees)
+        root.addLayout(form)
+
         reset = QPushButton("Reset counter")
         reset.clicked.connect(self.reset)
         root.addWidget(reset)
-        apply_btn = QPushButton("Set sensitivity from 360° turn")
+        apply_btn = QPushButton("Set sensitivity from turn")
         apply_btn.clicked.connect(self._apply_360)
         root.addWidget(apply_btn)
         self.result = QLabel("")
@@ -97,15 +106,16 @@ class CountsCalibratePanel(QWidget):
             self._apply_was = down
 
     def _apply_360(self) -> None:
+        deg = self.degrees.value()
         try:
             new = apply_sensitivity(self._handle, total_counts=float(self._x),
-                                    measured_deg=360.0)
+                                    measured_deg=deg)
         except Exception as exc:  # zero counts -> sensitivity gt=0 violated, etc.
-            self.result.setText(f"⚠ {exc} — do a full 360° turn first")
+            self.result.setText(f"⚠ {exc} — do the turn first")
             return
         self.result.setText(
             f"sensitivity = {new.aim.sensitivity:.5f} deg/count  "
-            f"(from {abs(self._x)} counts / 360°)")
+            f"(from {abs(self._x)} counts / {deg:g}°)")
         self.configChanged.emit(new)
 
     # ---- box-only raw-input lifecycle (capture only while tab is shown) -----

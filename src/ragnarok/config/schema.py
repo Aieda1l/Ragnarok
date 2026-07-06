@@ -37,6 +37,7 @@ class AimConfig(BaseModel):
     aimer: Literal["flick", "feedback", "hybrid", "predictive"] = "feedback"
     kp: float = Field(default=0.35, gt=0.0, le=2.0)
     max_step_px: float = Field(default=60.0, gt=0.0)
+    creep_px: float = Field(default=8.0, ge=0.0)   # feedback quadratic creep zone (0=off)
     flick_speed_px_s: float = Field(default=4000.0, gt=0.0)
     ema_alpha: float = Field(default=0.5, gt=0.0, le=1.0)
     aim_point: Literal["head", "body", "detected_head"] = "head"
