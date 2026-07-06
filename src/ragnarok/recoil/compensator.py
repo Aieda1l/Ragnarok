@@ -18,9 +18,11 @@ class RecoilPattern:
 
 
 class RecoilCompensator:
-    def __init__(self, pattern: RecoilPattern, *, scale: float = 1.0) -> None:
+    def __init__(self, pattern: RecoilPattern, *, scale: float = 1.0,
+                 fire_rate_rps: float = 0.0) -> None:
         self._pts = pattern.points
         self._scale = scale
+        self.fire_rate_rps = fire_rate_rps    # >0: advance per-shot while held (full-auto)
         self._idx = 0
 
     def on_fire(self) -> tuple[float, float]:
