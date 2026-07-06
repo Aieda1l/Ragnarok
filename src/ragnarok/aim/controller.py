@@ -67,6 +67,8 @@ class AimController:
         self._kff = float(getattr(cfg, "kff", 0.0))
         self._adaptive = bool(getattr(cfg, "adaptive_lead", False))
         self._last_ns: int | None = None
+        self._last_shot_ns: int = 0            # last recoil-advance time (full-auto pacing)
+        self._was_firing: bool = False         # trigger-release edge -> reset spray
         self._cur_target: int | None = None
         self.target_id: int | None = None
 
@@ -133,10 +135,10 @@ class AimController:
         dpx, dpy = self._aimer.step((chx, chy), lead_pt, dt, target_vel=(tvx, tvy))
         sx, sy = self._shaper.shape(dpx, dpy)
 
-        # trigger + recoil
-        # NOTE: recoil only advances on a NEW trigger-bot press (semi-auto).
-        # Per-burst/held-fire recoil and manual-fire (trigger-disabled) recoil
-        # are deferred (Phase 5).
+        # trigger + recoil. A new press restarts the spray from shot 0; while the
+        # trigger is HELD and recoil.fire_rate_rps > 0 (full-auto), the pattern
+        # advances one shot every 1/rps seconds. rps == 0 stays semi-auto (one
+        # shot per press).
         if self._trigger is not None:
             fired = self._trigger.update(
                 track=track,
@@ -146,10 +148,23 @@ class AimController:
                 line_clear=self._line_clear(),
                 active=self._trigger_active(),
             )
-            if fired and self._recoil is not None:
-                rx, ry = self._recoil.on_fire()
-                sx += rx
-                sy += ry
+            if self._recoil is not None:
+                now = self._clock()
+                rps = getattr(self._recoil, "fire_rate_rps", 0.0)
+                firing = self._trigger.is_firing
+                if self._was_firing and not firing:       # released -> reset the spray
+                    self._recoil.release()
+                if fired:                                  # a shot fired
+                    rx, ry = self._recoil.on_fire()
+                    sx += rx
+                    sy += ry
+                    self._last_shot_ns = now
+                elif rps > 0.0 and firing and now - self._last_shot_ns >= 1e9 / rps:
+                    rx, ry = self._recoil.on_fire()        # held full-auto -> next shot
+                    sx += rx
+                    sy += ry
+                    self._last_shot_ns = now
+                self._was_firing = firing
 
         k = self._deg_per_px / self._cfg.sensitivity   # px → mouse counts
         cdx, cdy = sx * k, sy * k

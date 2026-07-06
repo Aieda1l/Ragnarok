@@ -67,6 +67,11 @@ class TriggerBot:
             return True
         return False
 
+    @property
+    def is_firing(self) -> bool:
+        """True while the fire button is currently held down (for full-auto recoil)."""
+        return self._pressed
+
     def release(self) -> None:
         self._eligible_since = None
         self._release_if_pressed()
