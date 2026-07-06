@@ -20,6 +20,7 @@ from ragnarok.gui.tuning_model import (
 from ragnarok.gui.diagnostics_panel import DiagnosticsPanel
 from ragnarok.gui.profiles_panel import ProfilesPanel
 from ragnarok.gui.calibration_panel import CalibrationPanel
+from ragnarok.gui.counts_panel import CountsCalibratePanel
 from ragnarok.gui.dashboard_panel import DashboardPanel
 from ragnarok.gui.recoil_panel import RecoilPanel
 from ragnarok.gui.chrome_frame import ChromeFrame
@@ -226,6 +227,9 @@ def main() -> int:
     wizards = CalibrationPanel(handle)
     wizards.configChanged.connect(_on_config_changed)
     tabs.addTab(_scroll(wizards), "Wizards")
+    sens_cal = CountsCalibratePanel(handle)
+    sens_cal.configChanged.connect(_on_config_changed)
+    tabs.addTab(_scroll(sens_cal), "Calibrate")
 
     worker = WorkerThread(loop)
     window = MainWindow(publisher, controls=ChromeFrame(tabs))   # Cyberpunk panel chrome
