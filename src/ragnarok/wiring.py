@@ -94,7 +94,8 @@ def build_recoil(cfg: AppConfig):
     if not r.enabled or not r.pattern:
         return None
     from ragnarok.recoil.compensator import RecoilPattern, RecoilCompensator
-    return RecoilCompensator(RecoilPattern(points=r.pattern), scale=r.scale)
+    return RecoilCompensator(RecoilPattern(points=r.pattern), scale=r.scale,
+                             fire_rate_rps=r.fire_rate_rps)
 
 
 def build_mouse_driver(cfg, *, sendinput_factory, arduino_factory):
