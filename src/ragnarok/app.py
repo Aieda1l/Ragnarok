@@ -24,6 +24,7 @@ from ragnarok.gui.dashboard_panel import DashboardPanel
 from ragnarok.gui.recoil_panel import RecoilPanel
 from ragnarok.gui.chrome_frame import ChromeFrame
 from ragnarok.gui.live_config import AimReloader, WorkerReloader
+from ragnarok.gui.config_apply import apply_config_change
 from ragnarok.config.profiles import ProfileStore
 
 def _config_path() -> Path:
@@ -173,19 +174,20 @@ def main() -> int:
     tuning_panels: list[TuningPanel] = []
 
     def _on_config_changed(new_cfg):
-        # any panel edit / profile load: repaint the other tabs, then hot-reload
-        for tp in tuning_panels:
-            tp.refresh()
-        # A rebuild can raise on invalid config (e.g. arduino driver with an
-        # empty port -> build_arduino_transport raises at BUILD time). Never let
-        # that escape into the Qt event loop (PySide6 aborts on an unhandled slot
-        # exception). WorkerReloader leaves _prev stale on failure, so once the
-        # user supplies a valid value the next edit rebuilds cleanly.
-        try:
-            reloader.reload(new_cfg)
-        except Exception as exc:  # noqa: BLE001 — GUI must stay alive
+        # Any panel edit / profile load / calibration: PERSIST to disk (so it
+        # survives restart — the Calibrate/Profiles/Recoil/Diagnostics panels swap
+        # the live handle but had no on_save), repaint the other tabs, then
+        # hot-reload. A rebuild can raise on invalid config (e.g. arduino driver
+        # with an empty port); apply_config_change captures save/reload failures
+        # so they never escape into the Qt event loop (PySide6 aborts on an
+        # unhandled slot exception) — WorkerReloader leaves _prev stale on failure.
+        errors = apply_config_change(
+            new_cfg, save=_save,
+            refresh=[tp.refresh for tp in tuning_panels],
+            reload=reloader.reload)
+        for stage, exc in errors:
             import warnings
-            warnings.warn(f"config reload failed (keeping previous worker components): {exc}")
+            warnings.warn(f"config {stage} failed (GUI kept alive): {exc}")
 
     def _scroll(widget):
         # keep the window compact: overflowing options scroll instead of
