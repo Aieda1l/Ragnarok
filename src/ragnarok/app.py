@@ -19,7 +19,6 @@ from ragnarok.gui.tuning_model import (
     INPUT_FIELDS, DETECTION_FIELDS, OVERLAY_FIELDS, KEYBIND_FIELDS)
 from ragnarok.gui.diagnostics_panel import DiagnosticsPanel
 from ragnarok.gui.profiles_panel import ProfilesPanel
-from ragnarok.gui.calibration_panel import CalibrationPanel
 from ragnarok.gui.counts_panel import CountsCalibratePanel
 from ragnarok.gui.dashboard_panel import DashboardPanel
 from ragnarok.gui.recoil_panel import RecoilPanel
@@ -224,9 +223,6 @@ def main() -> int:
     profiles = ProfilesPanel(ProfileStore(_profiles_dir()), handle)
     profiles.configChanged.connect(_on_config_changed)
     tabs.addTab(_scroll(profiles), "Profiles")
-    wizards = CalibrationPanel(handle)
-    wizards.configChanged.connect(_on_config_changed)
-    tabs.addTab(_scroll(wizards), "Wizards")
     sens_cal = CountsCalibratePanel(handle)
     sens_cal.configChanged.connect(_on_config_changed)
     tabs.addTab(_scroll(sens_cal), "Calibrate")
