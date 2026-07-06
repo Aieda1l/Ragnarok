@@ -151,8 +151,14 @@ def main() -> int:
     from ragnarok.tracking.egomotion import CommandedMotionBuffer
     cmd_buffer = CommandedMotionBuffer()
     aim_controller = _build_fire_component(cfg, cmd_buffer)
+    detector = create_detector(cfg.detection)
+    if cfg.dynamic_roi.enabled:                 # opt-in SEARCH/TRACK crop+upscale
+        from ragnarok.detection.dynamic import DynamicRoiDetector
+        from ragnarok.detection.roi import DynamicRoiPlanner
+        detector = DynamicRoiDetector(detector, DynamicRoiPlanner(cfg.dynamic_roi),
+                                      model_input_px=cfg.dynamic_roi.model_input_px)
     loop = WorkerLoop(
-        create_capturer(cfg.capture), create_detector(cfg.detection),
+        create_capturer(cfg.capture), detector,
         StageProfiler(), publisher,
         # only feed GMC the buffer when aim is enabled (the buffer's only producer)
         tracker=build_tracker(cfg, gmc_buffer=cmd_buffer if cfg.aim.enabled else None),
