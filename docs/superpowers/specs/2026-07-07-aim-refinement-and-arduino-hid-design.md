@@ -9,10 +9,13 @@
 Live-play feedback: `feedback` aiming "works well enough" but the `flick`,
 `hybrid`, and `predictive` aimers **overshoot**, and the aim as a whole is not as
 **refined/snappy** as it should be — specifically **wobble/creep on arrival** and
-a **jittery/unsteady hold**. Separately, the Arduino output path must be reachable
-over **USB HID** and over **socket/WiFi**, targeting the user's real hardware:
-an **Arduino UNO R4 WiFi + USB Host Shield** (not the 32u4 the current firmware
-assumes).
+a **jittery/unsteady hold**. The **trigger bot doesn't really work** and must fire
+independently of auto-aim (shoot when the crosshair is on an enemy). Auto-aim and
+the trigger should each be an **independent on/off toggle** on a non-obtrusive
+hotkey, with **hold-to-aim removed**. Separately, the Arduino output path must be
+reachable over **USB HID** and over **socket/WiFi**, targeting the user's real
+hardware: an **Arduino UNO R4 WiFi + USB Host Shield** (not the 32u4 the current
+firmware assumes).
 
 This is Approach A: fix the overshoot and jitter at their sources, make the
 calibration that prevents overshoot actually apply, fix the wiring bugs that
@@ -98,6 +101,27 @@ in-flight commands older than that are re-corrected → overshoot.
   never checked → 2 s hang and unclean shutdown, and aim/trigger freeze on static
   scenes.
 
+### 2.6 Trigger bot: coupled to aim, and inert by default (verified)
+
+The standalone `TriggerController` logic is correct in isolation (its tests pass),
+but the way it is gated makes it "not really work":
+
+- **Chained to the aim key.** With `aim.enabled=True` (default), the trigger runs
+  *inside* `AimController.update`, which early-returns unless the aim key is held
+  (`controller.py:84`). So the trigger only fires *while auto-aim is engaged* —
+  never independently. The separate `TriggerController` (aim-off path) exists but
+  is easy to miss and shares the problems below.
+- **Default activation key is the fire button.** `trigger.trigger_key`
+  defaults to `VK_LBUTTON` and `button` to `left`; holding left (which already
+  fires) to "activate" a bot that also clicks left is a no-op to the eye.
+- **Hard `Team.ENEMY` gate.** If friend/foe is on but can't tag a target (tiny /
+  odd-coloured boxes), tracks stay `UNKNOWN` and it silently never fires. In a
+  single-player sandbox everything under the crosshair is a valid target.
+- **Reaction delay resets on 1-frame tracking gaps.** `activation_delay_ms=80`
+  with `occluded = time_since_update > 0` (`bot.py`) means any single missed
+  detection frame resets `_eligible_since`, so on flickery tracks the delay never
+  accumulates → feels dead.
+
 ## 3. Design
 
 ### 3.1 Aimer unification — commit fraction + terminal settle (fixes 2.1, 2.2)
@@ -148,6 +172,30 @@ fresh config/profile is steady out of the box:
 `dwell_ms`/`switch_margin` are left at their current values (the user did not
 report target-switch lag). Existing saved `config.toml` values are unaffected
 (defaults only fill unset fields).
+
+### 3.2b Activation model — independent toggles, no hold-to-aim (user request)
+
+Auto-aim and the trigger bot each become a **runtime toggle** flipped by its own
+dedicated, non-obtrusive hotkey; **hold-to-aim is removed** as the shipped model.
+
+- **Auto-aim toggle.** `aim.toggle` defaults to `True` (rising-edge toggle via the
+  existing `make_aim_active(..., toggle=True)` closure). `aim.aim_key` becomes the
+  *toggle* key; its default moves off `VK_RBUTTON` (ADS in most games) to a
+  non-obtrusive default (mouse side button `VK_XBUTTON2`). Pressing it once
+  engages continuous auto-aim; pressing again disengages. The `toggle=False` (hold)
+  path remains in code as an escape hatch but is no longer the default.
+- **Trigger toggle.** The trigger gets its own toggle key `trigger.trigger_key`,
+  defaulting to the other side button (`VK_XBUTTON1`), and is evaluated in
+  **toggle** mode (was hard-coded hold). When toggled on, it fires whenever the
+  crosshair is inside an enemy hitbox (§3.7). Its `button` (what it clicks) stays
+  `left`; the *toggle* key is now distinct from the clicked button, fixing the
+  self-conflict.
+- **State visibility.** Because toggles have no held-key feedback, the current
+  `AIM: ON/OFF` and `TRIGGER: ON/OFF` state is surfaced in the overlay HUD and the
+  Dashboard so the user always knows what is armed. The controller exposes the
+  live toggle state for the telemetry snapshot to publish.
+- Keybinds tab exposes both toggle keys; both are collision-checked against the
+  Calibrate hotkeys (`VK_HOME`/`VK_END`).
 
 ### 3.3 Capture-time timestamps (reduces 2.2 at the source)
 
@@ -245,6 +293,33 @@ one-shot assumption.
   stops the capturer (unblocking the waiter) before `join`; optionally a bounded
   `get_latest_frame` wait so aim/trigger keep ticking on static frames.
 
+### 3.7 Trigger bot rework — independent, reliable (fixes 2.6)
+
+Make the trigger a first-class, independently-toggled behaviour that fires on
+crosshair-over-enemy whether or not auto-aim is engaged.
+
+- **Decouple from the aim key.** Restructure `AimController.update` so the trigger
+  section runs **every tick** (gated only by its own `trigger_active()` toggle),
+  *before* the aim-active early-return; the aim-assist section (selection, IMM
+  lead, aimer step, cursor move) stays gated by `aim.enabled && aim_active()`.
+  `_disengage` resets aim state without releasing the trigger. One component owns
+  the mouse, so there is no double-fire.
+- **Unify the two paths.** `AimController` becomes the single fire/aim component
+  whenever `aim.enabled || trigger.enabled`. When `aim.enabled` is false it still
+  ticks the trigger; the standalone `TriggerController` is retired (or reduced to
+  a thin alias) so there is one trigger implementation and one recoil path.
+- **Fire on crosshair-containment.** The trigger targets the ENEMY track whose
+  hitbox contains the crosshair (ROI centre), not the FOV-selected aim target —
+  the correct test for "the crosshair is pointed at an enemy." With friend/foe
+  off, `AllEnemyClassifier` already tags every detection ENEMY, so it "just
+  works"; with friend/foe on, only classified enemies are shot (safety preserved).
+- **Reliable delay.** `trigger.activation_delay_ms` default `80 → 35`; the
+  eligibility timer tolerates brief occlusion (a configurable
+  `max_occlusion_frames`, default ~2) instead of resetting on any single coasted
+  frame, so flickery detections still fire. `require_line_clear` unchanged.
+- **Recoil path** moves into the (now always-run) trigger section, so recoil
+  compensation and full-auto pacing work with auto-aim off too.
+
 ## 4. Data flow (unchanged seams)
 
 Capture → detect → track (IMM/GMC) → classify → `AimController.update` →
@@ -272,7 +347,13 @@ TDD, CI-safe (no GPU/Windows/serial/HID/MCU in tests):
   remaining distance, (b) settle deadzone zeroes sub-`settle_px` motion,
   (c) `commit=1.0` reproduces prior flick/hybrid/predictive output, (d) feedback
   unchanged. Keep the §15 step-response regression green.
-- Schema defaults: assert new default values and that existing TOML round-trips.
+- Schema defaults: assert new default values (incl. `aim.toggle=True`, toggle-key
+  defaults, `activation_delay_ms=35`) and that existing TOML round-trips.
+- Trigger rework: trigger fires independently of aim-active state; fires on
+  crosshair-contained ENEMY; retires/aliases `TriggerController` with the same
+  observable behaviour; delay tolerates `max_occlusion_frames`; toggle-mode
+  activation via a `FakeKeyProvider` rising edge; recoil applied on fire with aim
+  off. Toggle state is exposed for telemetry.
 - Timestamp plumbing: `Frame.t_capture_ns` sourced from an injected arrival clock;
   assert IMM `dt` uses arrival deltas (fake capturer).
 - Latency latch: `tick()` keeps `latency_ms` across publishes until a new request;
@@ -302,7 +383,8 @@ firmware; HIL latency; live overshoot/snappiness feel.
 ## 8. Rollout
 
 Implemented as small TDD increments in dependency order: (1) aimer commit/settle
-+ schema defaults, (2) latency latch + timestamp, (3) TOCTOU/shutdown cleanup,
-(4) single-driver wiring + `HidTransport` + config, (5) firmware (box-only).
++ schema defaults, (2) trigger rework + toggle activation (aim + trigger) + state
+telemetry, (3) latency latch + timestamp, (4) TOCTOU/shutdown cleanup, (5)
+single-driver wiring + `HidTransport` + config, (6) firmware (box-only).
 Each increment is independently testable and mergeable. Firmware lands last and is
 flashed/verified by the user.
