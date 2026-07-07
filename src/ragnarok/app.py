@@ -163,9 +163,11 @@ def build_tabs(handle, publisher, *, loop, on_save, on_changed):
     tuning.append(aim)
     tabs.addTab(_scroll(aim), "Aim")
 
+    from ragnarok.gui.eyedropper_panel import EyedropperPanel
     tabs.addTab(grouped_tab([_tp(DETECTION_FIELDS, "Detection"),
                              _tp(TRACKING_FIELDS, "Tracking"),
-                             _tp(CLASSIFICATION_FIELDS, "Friend/Foe")]), "Targeting")
+                             _tp(CLASSIFICATION_FIELDS, "Friend/Foe"),
+                             _wire(EyedropperPanel(handle, publisher))]), "Targeting")
 
     tabs.addTab(grouped_tab([_tp(TRIGGER_FIELDS, "Trigger"),
                              _wire(RecoilPanel(handle))]), "Fire")
