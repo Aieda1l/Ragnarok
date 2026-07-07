@@ -32,9 +32,13 @@ class _RawMouseFilter(QAbstractNativeEventFilter):
 class CountsCalibratePanel(QWidget):
     configChanged = Signal(object)
 
-    def __init__(self, handle, *, reset_provider=None, apply_provider=None) -> None:
+    def __init__(self, handle, *, reset_provider=None, apply_provider=None,
+                 loop=None, publisher=None) -> None:
         super().__init__()
         self._handle = handle
+        self._loop = loop                # WorkerLoop, for request_latency_measure
+        self._publisher = publisher      # SnapshotPublisher, to read the result back
+        self._poll: QTimer | None = None
         self._x = 0
         self._y = 0
         self._filter = _RawMouseFilter(self._on_counts)
@@ -81,6 +85,15 @@ class CountsCalibratePanel(QWidget):
         self.result = QLabel("")
         root.addWidget(self.result)
 
+        root.addWidget(QLabel(
+            "\nLATENCY (Smith predictor + GMC): aim at a flat wall, then measure — "
+            "the view will jitter briefly."))
+        measure = QPushButton("Measure latency (aim at wall)")
+        measure.clicked.connect(self._start_latency_measure)
+        root.addWidget(measure)
+        self.latency_result = QLabel("")
+        root.addWidget(self.latency_result)
+
     # ---- testable model surface --------------------------------------------
     def _on_counts(self, dx: int, dy: int) -> None:
         self._x += int(dx)
@@ -117,6 +130,53 @@ class CountsCalibratePanel(QWidget):
             f"sensitivity = {new.aim.sensitivity:.5f} deg/count  "
             f"(from {abs(self._x)} counts / {deg:g}°)")
         self.configChanged.emit(new)
+
+    # ---- latency measurement (testable seams + box-only countdown) ---------
+    def _request_now(self) -> None:
+        """Ask the worker to run a latency measurement + start polling for the result."""
+        if self._loop is None:
+            return
+        self._loop.request_latency_measure(2.5)
+        self.latency_result.setText("measuring… keep aiming at the wall")
+        if self._publisher is not None:
+            self._poll = QTimer(self)
+            self._poll.setInterval(200)
+            self._poll.timeout.connect(self._check_latency)
+            self._poll.start()
+
+    def _check_latency(self) -> None:
+        snap = self._publisher.latest() if self._publisher is not None else None
+        if snap is not None and snap.latency_ms is not None:
+            if self._poll is not None:
+                self._poll.stop()
+            self.apply_latency_ms(snap.latency_ms)
+
+    def apply_latency_ms(self, ms: float) -> None:
+        """Write the measured latency to aim.deadtime_ms + tracking.tau_render_s."""
+        cfg = self._handle.current
+        new = cfg.model_copy(update={
+            "aim": cfg.aim.model_copy(update={"deadtime_ms": float(ms)}),
+            "tracking": cfg.tracking.model_copy(update={"tau_render_s": float(ms) / 1000.0})})
+        self._handle.swap(new)
+        self.latency_result.setText(f"latency = {ms:g} ms  (deadtime + tau_render set)")
+        self.configChanged.emit(new)
+
+    def _start_latency_measure(self) -> None:  # pragma: no cover — box-only countdown UX
+        self._count = 3
+        self.latency_result.setText("click into your game + aim at a wall… 3")
+        self._cd = QTimer(self)
+        self._cd.setInterval(1000)
+
+        def _tick():
+            self._count -= 1
+            if self._count <= 0:
+                self._cd.stop()
+                self._request_now()
+            else:
+                self.latency_result.setText(f"aim at a wall… {self._count}")
+
+        self._cd.timeout.connect(_tick)
+        self._cd.start()
 
     # ---- box-only raw-input lifecycle (capture only while tab is shown) -----
     def showEvent(self, event) -> None:  # pragma: no cover — box-only
