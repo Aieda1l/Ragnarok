@@ -192,6 +192,8 @@ class OverlayConfig(BaseModel):
     show_boxes: bool = True                       # draw teammate/unknown do-not-shoot boxes
     show_tracking_line: bool = True              # dashed crosshair -> locked-target line
     diamond_scale: float = Field(default=1.0, gt=0.0, le=5.0)
+    scanlines: bool = False                       # CRT scanline overlay (cosmetic)
+    chroma: bool = False                          # chromatic-aberration crosshair ghost (cosmetic)
 
 
 class DynamicRoiConfig(BaseModel):

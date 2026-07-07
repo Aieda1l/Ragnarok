@@ -115,9 +115,14 @@ class FovOverlay(QWidget):
             for (a, b) in scene.fov_thick:
                 p.drawLine(QPointF(a[0], a[1]), QPointF(b[0], b[1]))
 
-        # crosshair tick
-        p.setPen(QPen(cyan, 1))
+        # crosshair tick (optional chromatic-aberration ghost)
         cx, cy = scene.crosshair
+        if ov.chroma:
+            for off, gc in ((-2, QColor(255, 40, 40, 150)), (2, QColor(40, 220, 255, 150))):
+                p.setPen(QPen(gc, 1))
+                p.drawLine(QPointF(cx - 6 + off, cy), QPointF(cx + 6 + off, cy))
+                p.drawLine(QPointF(cx + off, cy - 6), QPointF(cx + off, cy + 6))
+        p.setPen(QPen(cyan, 1))
         p.drawLine(QPointF(cx - 6, cy), QPointF(cx + 6, cy))
         p.drawLine(QPointF(cx, cy - 6), QPointF(cx, cy + 6))
 
@@ -154,6 +159,19 @@ class FovOverlay(QWidget):
         # off-screen direction hints: red diamonds at the viewport edge
         for h in scene.offscreen:
             self._diamond(p, h.edge_point[0], h.edge_point[1], 5 * scale, red)
+
+        self._draw_fx(p, ov)
+
+    def _draw_fx(self, p: QPainter, ov) -> None:
+        """Cosmetic CRT scanlines across the whole overlay (spec §10 aesthetic)."""
+        if not ov.scanlines:
+            return
+        p.setPen(QPen(QColor(0, 0, 0, 60), 1))
+        w, h = self.width(), self.height()
+        y = 0
+        while y < h:
+            p.drawLine(0, y, w, y)
+            y += 3
 
     @staticmethod
     def _diamond(p: QPainter, cx: float, cy: float, r: float, col: QColor,
