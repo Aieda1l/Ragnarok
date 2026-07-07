@@ -8,6 +8,7 @@ from ragnarok.telemetry.snapshot import TelemetrySnapshot, SnapshotPublisher
 from ragnarok.tracking.base import Tracker, IdentityTracker
 from ragnarok.classification.base import FriendFoeClassifier, NullClassifier
 from ragnarok.gui.overlay import draw_overlay
+from ragnarok.aim.latency_measure import WallLatencyMeasurer
 
 class WorkerLoop:
     def __init__(self, capturer, detector, profiler: StageProfiler,
@@ -25,6 +26,15 @@ class WorkerLoop:
         self._aim = aim_controller          # optional; None keeps Phase 1/2 behavior
         self._seq = 0
         self._last_ns: int | None = None
+        self._measure_mouse = None          # SendInput driver for latency measurement
+        self._measure_req: float | None = None   # requested duration_s (GIL-atomic rebind)
+        self._measure_ms: float | None = None    # result, surfaced in ONE snapshot
+
+    def set_measure_mouse(self, mouse) -> None:
+        self._measure_mouse = mouse
+
+    def request_latency_measure(self, duration_s: float = 2.5) -> None:
+        self._measure_req = float(duration_s)    # consumed once at the top of tick()
 
     def set_aim_controller(self, controller) -> None:
         """Atomically hot-swap the aim controller (or None to disable aim).
@@ -53,6 +63,13 @@ class WorkerLoop:
         return np.ascontiguousarray(image)
 
     def tick(self) -> None:
+        req = self._measure_req
+        if req is not None:                      # latency measurement: blocks this tick
+            self._measure_req = None
+            self._measure_ms = None
+            if self._measure_mouse is not None:
+                lag = WallLatencyMeasurer(self._cap, self._measure_mouse, duration_s=req).run()
+                self._measure_ms = round(lag * 1000.0, 1) if lag is not None else None
         t0 = now_ns()
         frame = self._cap.grab()
         t_cap = now_ns()
@@ -106,7 +123,9 @@ class WorkerLoop:
             tracks=tuple(tracks),
             locked_target_id=getattr(aim, "target_id", None),
             roi_region=frame.region,
+            latency_ms=self._measure_ms,
         ))
+        self._measure_ms = None                  # surface a measurement in exactly one snapshot
 
     def run(self, stop_event: threading.Event) -> None:
         self._cap.start()
