@@ -37,6 +37,8 @@ AIM_FIELDS: tuple[FieldSpec, ...] = (
     FieldSpec("aim.kff", "Kff (feed-fwd)", "float", 0.0, 4.0, 0.05),
     FieldSpec("aim.max_step_px", "Max step (px)", "float", 1.0, 300.0, 1.0),
     FieldSpec("aim.creep_px", "Creep zone (px)", "float", 0.0, 100.0, 1.0),
+    FieldSpec("aim.commit", "Commit fraction", "float", 0.05, 1.0, 0.05),
+    FieldSpec("aim.settle_px", "Settle deadzone (px)", "float", 0.0, 20.0, 0.5),
     FieldSpec("aim.deadtime_ms", "Latency comp (ms)", "float", 0.0, 500.0, 5.0),
     FieldSpec("aim.pinhole", "Pinhole projection", "bool"),
     FieldSpec("aim.ema_alpha", "EMA alpha", "float", 0.01, 1.0, 0.01),
