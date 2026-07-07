@@ -55,6 +55,7 @@ def _optimize_fp16(model, dtype=None) -> bool:
 class RFDETRTorchDetector(Detector):
     def __init__(self, config: DetectionConfig, *, model=None) -> None:
         self._config = config
+        self._confidence = float(config.confidence)   # live-tunable threshold
         if model is None:
             import rfdetr  # lazy: keeps torch/weights out of unit tests
             on_cuda = _report_device()      # loud warning if this will run on CPU
@@ -64,7 +65,10 @@ class RFDETRTorchDetector(Detector):
                 _optimize_fp16(model)
         self._model = model
 
+    def set_confidence(self, conf: float) -> None:
+        self._confidence = float(conf)
+
     def detect(self, frame: Frame) -> Detections:
         rgb = cv2.cvtColor(frame.image, cv2.COLOR_BGR2RGB)
-        sv = self._model.predict(rgb, threshold=self._config.confidence)
+        sv = self._model.predict(rgb, threshold=self._confidence)
         return to_detections(sv)

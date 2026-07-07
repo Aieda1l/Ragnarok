@@ -46,6 +46,9 @@ class DynamicRoiDetector(Detector):
         self._center: tuple[float, float] | None = None
         self._has_lock = False
 
+    def set_confidence(self, conf: float) -> None:
+        self._base.set_confidence(conf)
+
     def observe_lock(self, center, has_lock: bool) -> None:
         """Feed back the current locked-target centre (full-frame px) so the NEXT
         frame's plan can crop around it. Called by the worker after aim."""
