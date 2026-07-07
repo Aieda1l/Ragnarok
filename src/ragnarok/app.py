@@ -131,6 +131,59 @@ def _build_aim_controller(cfg, commanded_buffer):
         commanded_buffer=commanded_buffer,
     )
 
+def build_tabs(handle, publisher, *, loop, on_save, on_changed):
+    """Assemble the 7 grouped setting tabs. Returns (QTabWidget, [TuningPanel]) —
+    the panel list is what _on_config_changed refreshes. Single-purpose field tabs
+    are collapsed into Targeting / Fire / Interface / Advanced via grouped_tab."""
+    from ragnarok.gui.tab_groups import grouped_tab
+
+    def _scroll(w):
+        area = QScrollArea()
+        area.setWidgetResizable(True)
+        area.setWidget(w)
+        return area
+
+    tuning: list[TuningPanel] = []
+
+    def _tp(fields, title):
+        p = TuningPanel(handle, fields=fields, on_save=on_save, title=title)
+        p.configChanged.connect(on_changed)
+        tuning.append(p)
+        return p
+
+    def _wire(panel):                       # non-TuningPanel: reload only, no refresh()
+        panel.configChanged.connect(on_changed)
+        return panel
+
+    tabs = QTabWidget()
+    tabs.addTab(_scroll(DashboardPanel(publisher)), "Dashboard")
+
+    aim = TuningPanel(handle, on_save=on_save, title="Aim")
+    aim.configChanged.connect(on_changed)
+    tuning.append(aim)
+    tabs.addTab(_scroll(aim), "Aim")
+
+    tabs.addTab(grouped_tab([_tp(DETECTION_FIELDS, "Detection"),
+                             _tp(TRACKING_FIELDS, "Tracking"),
+                             _tp(CLASSIFICATION_FIELDS, "Friend/Foe")]), "Targeting")
+
+    tabs.addTab(grouped_tab([_tp(TRIGGER_FIELDS, "Trigger"),
+                             _wire(RecoilPanel(handle))]), "Fire")
+
+    tabs.addTab(_scroll(_wire(CountsCalibratePanel(handle, loop=loop, publisher=publisher))),
+                "Calibrate")
+
+    tabs.addTab(grouped_tab([_tp(KEYBIND_FIELDS, "Keybinds"),
+                             _tp(OVERLAY_FIELDS, "Overlay"),
+                             _tp(INPUT_FIELDS, "Input"),
+                             _wire(ProfilesPanel(ProfileStore(_profiles_dir()), handle))]),
+                "Interface")
+
+    tabs.addTab(grouped_tab([_wire(DiagnosticsPanel(handle)),
+                             _tp(MOTION_FIELDS, "Motion")]), "Advanced")
+    return tabs, tuning
+
+
 def main() -> int:
     app = QApplication(sys.argv)
     from ragnarok.gui import theme
@@ -165,6 +218,7 @@ def main() -> int:
         classifier=build_classifier(cfg),
         aim_controller=aim_controller,
     )
+    loop.set_measure_mouse(_build_mouse(cfg))       # for the Calibrate-tab latency measure
     # Live config: the tuning panel edits funnel through ConfigHandle.swap and
     # rebuild the aim controller in-place (spec §13 immutable snapshot swap).
     handle = ConfigHandle(cfg)
@@ -195,45 +249,8 @@ def main() -> int:
             import warnings
             warnings.warn(f"config {stage} failed (GUI kept alive): {exc}")
 
-    def _scroll(widget):
-        # keep the window compact: overflowing options scroll instead of
-        # stretching the window taller.
-        area = QScrollArea()
-        area.setWidgetResizable(True)
-        area.setWidget(widget)
-        return area
-
-    tabs = QTabWidget()
-    dashboard = DashboardPanel(publisher)
-    tabs.addTab(_scroll(dashboard), "Dashboard")
-    aim_panel = TuningPanel(handle, on_save=_save, title="Aim")
-    aim_panel.configChanged.connect(_on_config_changed)
-    tuning_panels.append(aim_panel)
-    tabs.addTab(_scroll(aim_panel), "Aim")
-    diagnostics = DiagnosticsPanel(handle)
-    diagnostics.configChanged.connect(_on_config_changed)
-    tabs.addTab(_scroll(diagnostics), "Diagnostics")
-    for fields, title in ((DETECTION_FIELDS, "Detection"),
-                          (TRACKING_FIELDS, "Tracking"),
-                          (CLASSIFICATION_FIELDS, "Friend/Foe"),
-                          (TRIGGER_FIELDS, "Trigger"),
-                          (MOTION_FIELDS, "Motion"),
-                          (KEYBIND_FIELDS, "Keybinds"),
-                          (OVERLAY_FIELDS, "Overlay"),
-                          (INPUT_FIELDS, "Input")):
-        p = TuningPanel(handle, fields=fields, on_save=_save, title=title)
-        p.configChanged.connect(_on_config_changed)
-        tuning_panels.append(p)
-        tabs.addTab(_scroll(p), title)
-    recoil = RecoilPanel(handle)                 # dedicated spray-pattern editor
-    recoil.configChanged.connect(_on_config_changed)
-    tabs.addTab(_scroll(recoil), "Recoil")
-    profiles = ProfilesPanel(ProfileStore(_profiles_dir()), handle)
-    profiles.configChanged.connect(_on_config_changed)
-    tabs.addTab(_scroll(profiles), "Profiles")
-    sens_cal = CountsCalibratePanel(handle)
-    sens_cal.configChanged.connect(_on_config_changed)
-    tabs.addTab(_scroll(sens_cal), "Calibrate")
+    tabs, tuning_panels = build_tabs(handle, publisher, loop=loop,
+                                     on_save=_save, on_changed=_on_config_changed)
 
     worker = WorkerThread(loop)
     window = MainWindow(publisher, controls=ChromeFrame(tabs))   # Cyberpunk panel chrome
