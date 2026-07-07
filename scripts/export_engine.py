@@ -2,6 +2,8 @@
 the app config at it.
 
 Run (after scripts/train.py):  uv run python scripts/export_engine.py
+INT8 (smaller/faster, tiny accuracy loss):  uv run python scripts/export_engine.py --int8
+   (calibrates on dataset/train; TensorRT 11 reads the ONNX Q/DQ nodes.)
 
 The TRT runtime (detection.rfdetr_trt) reads the engine's output shapes, so the
 2-class trained model works without any code change.
@@ -9,6 +11,7 @@ The TRT runtime (detection.rfdetr_trt) reads the engine's output shapes, so the
 from __future__ import annotations
 
 import glob
+import sys
 from pathlib import Path
 
 from rfdetr import RFDETRSmall
@@ -29,10 +32,16 @@ def _best_checkpoint() -> str:
 
 
 def main() -> None:
+    int8 = "--int8" in sys.argv
     ckpt = _best_checkpoint()
-    print("checkpoint:", ckpt)
+    print("checkpoint:", ckpt, "| INT8" if int8 else "| FP16/TF32")
     Path("engines").mkdir(exist_ok=True)
-    onnx = RFDETRSmall(pretrain_weights=ckpt).export(output_dir="engines", format="onnx")
+    export_kwargs = dict(output_dir="engines", format="onnx")
+    if int8:                                   # PTQ: rfdetr writes Q/DQ nodes into the ONNX
+        export_kwargs.update(quantization="int8", calibration_data="dataset/train",
+                             max_images=100)
+        print("INT8: calibrating on dataset/train (100 imgs)…")
+    onnx = RFDETRSmall(pretrain_weights=ckpt).export(**export_kwargs)
     print("onnx:", onnx)
     engine = build_trt_engine(str(onnx), "engines/rfdetr-trained.engine")
     print("engine:", engine)
