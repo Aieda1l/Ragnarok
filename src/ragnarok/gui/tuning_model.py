@@ -132,6 +132,8 @@ OVERLAY_FIELDS: tuple[FieldSpec, ...] = (
     FieldSpec("overlay.show_boxes", "Show non-enemy boxes", "bool"),
     FieldSpec("overlay.show_tracking_line", "Show tracking line", "bool"),
     FieldSpec("overlay.diamond_scale", "Diamond size", "float", 0.2, 5.0, 0.1),
+    FieldSpec("overlay.scanlines", "CRT scanlines", "bool"),
+    FieldSpec("overlay.chroma", "Chromatic aberration", "bool"),
 )
 
 KEYBIND_FIELDS: tuple[FieldSpec, ...] = (
