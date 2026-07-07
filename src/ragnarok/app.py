@@ -189,6 +189,15 @@ def main() -> int:
     from ragnarok.gui import theme
     theme.apply_theme(app)                 # Cyberpunk 2077 skin (spec §10.1)
     cfg = load_config(_config_path())
+    try:                                    # warn if the aim FOV width doesn't match the monitor
+        from ragnarok.capture.factory import _screen_size
+        real_w, _rh = _screen_size()
+        if real_w and real_w != cfg.aim.screen_width_px:
+            import warnings
+            warnings.warn(f"aim.screen_width_px={cfg.aim.screen_width_px} != actual monitor "
+                          f"width {real_w}; px->counts gain will be off — set it to {real_w}.")
+    except Exception:
+        pass
     publisher = SnapshotPublisher()
     if cfg.tracking.gmc == "feedforward":
         reasons = []
