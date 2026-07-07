@@ -32,13 +32,17 @@ class Session(Protocol):
 class RFDETRTensorRTDetector(Detector):
     def __init__(self, config: DetectionConfig, *, session: Session | None = None) -> None:
         self._config = config
+        self._confidence = float(config.confidence)   # live-tunable threshold
         if session is None:
             session = _build_trt_session(config.engine_path)  # lazy/box-only
         self._session = session
 
+    def set_confidence(self, conf: float) -> None:
+        self._confidence = float(conf)
+
     def detect(self, frame: Frame) -> Detections:
         rgb = cv2.cvtColor(frame.image, cv2.COLOR_BGR2RGB)
-        boxes, scores, classes = self._session.infer(rgb, threshold=self._config.confidence)
+        boxes, scores, classes = self._session.infer(rgb, threshold=self._confidence)
         items = tuple(
             Detection(xyxy=(float(x1), float(y1), float(x2), float(y2)),
                       confidence=float(s), class_id=int(c))
