@@ -30,6 +30,10 @@ class AimConfig(BaseModel):
     toggle: bool = False                        # False = hold-to-aim
     hfov_deg: float = Field(default=90.0, gt=0.0, le=180.0)
     screen_width_px: int = Field(default=1920, ge=320, le=7680)
+    # True rectilinear (pinhole) px->deg near the crosshair instead of the linear
+    # hfov/width approximation (consistent with the GMC). Changes the gain, so it
+    # needs a re-calibrate — default off keeps existing calibration valid.
+    pinhole: bool = False
     aim_fov_deg: float = Field(default=5.0, gt=0.0, le=179.0)      # acquire (inner)
     retain_fov_deg: float = Field(default=8.0, gt=0.0, le=179.0)   # keep (outer) > inner
     dwell_ms: float = Field(default=100.0, ge=0.0, le=2000.0)
