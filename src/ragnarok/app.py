@@ -165,6 +165,7 @@ def main() -> int:
         classifier=build_classifier(cfg),
         aim_controller=aim_controller,
     )
+    loop.set_measure_mouse(_build_mouse(cfg))       # for the Calibrate-tab latency measure
     # Live config: the tuning panel edits funnel through ConfigHandle.swap and
     # rebuild the aim controller in-place (spec §13 immutable snapshot swap).
     handle = ConfigHandle(cfg)
@@ -231,7 +232,7 @@ def main() -> int:
     profiles = ProfilesPanel(ProfileStore(_profiles_dir()), handle)
     profiles.configChanged.connect(_on_config_changed)
     tabs.addTab(_scroll(profiles), "Profiles")
-    sens_cal = CountsCalibratePanel(handle)
+    sens_cal = CountsCalibratePanel(handle, loop=loop, publisher=publisher)
     sens_cal.configChanged.connect(_on_config_changed)
     tabs.addTab(_scroll(sens_cal), "Calibrate")
 
