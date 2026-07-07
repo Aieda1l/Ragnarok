@@ -89,6 +89,9 @@ class ClassificationConfig(BaseModel):
     enabled: bool = True
     palette: Literal["default", "wong"] = "default"
     enemy_color: str = "red"                  # key within the chosen palette
+    # Custom eyedropped HSV band (h_lo,h_hi,s_lo,s_hi,v_lo,v_hi); overrides the
+    # palette when set, so any in-game enemy colour can be matched.
+    custom_band: tuple[int, int, int, int, int, int] | None = None
     frac_threshold: float = Field(default=0.18, ge=0.0, le=1.0)
     thickness: int = Field(default=4, ge=1, le=64)
     vote_window: int = Field(default=5, ge=1, le=120)

@@ -43,8 +43,12 @@ def build_classifier(cfg: AppConfig) -> FriendFoeClassifier:
     if not c.enabled:
         return AllEnemyClassifier()          # off => treat every detection as a target
     from ragnarok.classification.base import HSVRingClassifier
-    from ragnarok.classification.color import resolve_enemy_profile
-    profile = resolve_enemy_profile(c.palette, c.enemy_color)
+    if c.custom_band is not None:                     # eyedropped custom colour wins
+        from ragnarok.classification.eyedropper import profile_from_band
+        profile = profile_from_band(c.custom_band)
+    else:
+        from ragnarok.classification.color import resolve_enemy_profile
+        profile = resolve_enemy_profile(c.palette, c.enemy_color)
     return HSVRingClassifier(
         profile,
         frac_threshold=c.frac_threshold,
