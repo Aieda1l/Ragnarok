@@ -5,6 +5,7 @@ import math
 import pytest
 
 from ragnarok.aim.aimers import FlickAimer, FeedbackAimer, NullAimer, Aimer
+from ragnarok.aim.aimers import HybridAimer, PredictiveAimer
 
 
 # ---------------------------------------------------------------------------
@@ -153,3 +154,64 @@ def test_feedback_kff_hook_exists():
 
 def test_feedback_is_aimer_subclass():
     assert isinstance(FeedbackAimer(kp=0.5, max_step_px=100.0), Aimer)
+
+
+# ---------------------------------------------------------------------------
+# commit fraction + shared settle deadzone (Phase 9P Task 1)
+# ---------------------------------------------------------------------------
+
+def test_settle_deadzone_zeroes_small_error_flick():
+    a = FlickAimer(flick_speed_px_s=1000.0, settle_px=3.0)
+    assert a.step((0.0, 0.0), (2.0, 0.0), dt=1.0) == (0.0, 0.0)   # 2px <= 3px -> hold
+
+
+def test_flick_moves_outside_settle():
+    a = FlickAimer(flick_speed_px_s=1000.0, settle_px=3.0)
+    dx, dy = a.step((0.0, 0.0), (10.0, 0.0), dt=1.0)
+    assert abs(dx - 10.0) < 1e-6 and abs(dy) < 1e-6
+
+
+def test_predictive_clamps_to_remaining_not_max_step():
+    # error 5px, max_step 60, commit 1.0 -> must NOT exceed remaining distance
+    a = PredictiveAimer(max_step_px=60.0, kff=0.0, commit=1.0)
+    dx, dy = a.step((0.0, 0.0), (5.0, 0.0), dt=0.016)
+    assert abs(dx - 5.0) < 1e-6, f"overshoot dx={dx}"
+
+
+def test_predictive_commit_scales_step():
+    a = PredictiveAimer(max_step_px=60.0, kff=0.0, commit=0.5)
+    dx, dy = a.step((0.0, 0.0), (40.0, 0.0), dt=0.016)   # remaining 40, commit .5 -> 20
+    assert abs(dx - 20.0) < 1e-6, f"dx={dx}"
+
+
+def test_predictive_commit_one_reproduces_full_step_within_max():
+    a = PredictiveAimer(max_step_px=60.0, kff=0.0, commit=1.0)
+    dx, dy = a.step((0.0, 0.0), (30.0, 0.0), dt=0.016)
+    assert abs(dx - 30.0) < 1e-6
+
+
+def test_hybrid_close_leg_commit_fraction():
+    # inside flick_dist (20): snap the remaining error * commit
+    a = HybridAimer(kp=0.35, max_step_px=60.0, flick_dist_px=20.0,
+                    flick_speed_px_s=4000.0, commit=0.5)
+    dx, dy = a.step((0.0, 0.0), (10.0, 0.0), dt=0.016)
+    assert abs(dx - 5.0) < 1e-6, f"dx={dx}"
+
+
+def test_feedback_ignores_commit_and_stays_identical():
+    # FeedbackAimer has no commit param; settle_px default 0 -> byte-identical
+    a = FeedbackAimer(kp=0.35, max_step_px=60.0)
+    dx, dy = a.step((0.0, 0.0), (100.0, 0.0), dt=0.016)
+    assert abs(dx - 35.0) < 1e-6   # kp*100, unchanged
+
+
+def test_predictive_remaining_clamp_does_not_kill_feedforward_at_zero_error():
+    # Regression: the remaining-distance clamp must bound the POSITIONAL
+    # component only, not the velocity feed-forward term. A confidently-tracked
+    # target moving steadily alongside the crosshair (zero positional error)
+    # must still get its kff lead -- clamping to remaining==0 here would wrongly
+    # zero it out (this is exactly test_predictive_adds_velocity_feedforward in
+    # test_hybrid_predictive.py, re-asserted here as the commit=1.0 case).
+    a = PredictiveAimer(max_step_px=1000.0, kff=1.0, commit=1.0)
+    dx, dy = a.step((0.0, 0.0), (0.0, 0.0), dt=0.01, target_vel=(500.0, 0.0))
+    assert abs(dx - 5.0) < 1e-6, f"feed-forward wrongly clamped to remaining=0: dx={dx}"
