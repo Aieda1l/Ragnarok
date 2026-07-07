@@ -13,3 +13,7 @@ def to_detections(sv) -> Detections:
 class Detector(ABC):
     @abstractmethod
     def detect(self, frame: Frame) -> Detections: ...
+
+    def set_confidence(self, conf: float) -> None:
+        """Live-update the detection threshold (cheap; no model rebuild). Default
+        no-op for detectors without a threshold."""

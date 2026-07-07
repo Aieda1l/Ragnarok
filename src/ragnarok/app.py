@@ -131,6 +131,17 @@ def _build_aim_controller(cfg, commanded_buffer):
         commanded_buffer=commanded_buffer,
     )
 
+def _build_detector(cfg):
+    """Detector from cfg, wrapped in Dynamic-ROI when enabled (box-only)."""
+    detector = create_detector(cfg.detection)
+    if cfg.dynamic_roi.enabled:                 # opt-in SEARCH/TRACK crop+upscale
+        from ragnarok.detection.dynamic import DynamicRoiDetector
+        from ragnarok.detection.roi import DynamicRoiPlanner
+        detector = DynamicRoiDetector(detector, DynamicRoiPlanner(cfg.dynamic_roi),
+                                      model_input_px=cfg.dynamic_roi.model_input_px)
+    return detector
+
+
 def build_tabs(handle, publisher, *, loop, on_save, on_changed):
     """Assemble the 7 grouped setting tabs. Returns (QTabWidget, [TuningPanel]) —
     the panel list is what _on_config_changed refreshes. Single-purpose field tabs
@@ -164,7 +175,9 @@ def build_tabs(handle, publisher, *, loop, on_save, on_changed):
     tabs.addTab(_scroll(aim), "Aim")
 
     from ragnarok.gui.eyedropper_panel import EyedropperPanel
+    from ragnarok.gui.detector_reload_panel import DetectorReloadPanel
     tabs.addTab(grouped_tab([_tp(DETECTION_FIELDS, "Detection"),
+                             DetectorReloadPanel(handle, loop, _build_detector),
                              _tp(TRACKING_FIELDS, "Tracking"),
                              _tp(CLASSIFICATION_FIELDS, "Friend/Foe"),
                              _wire(EyedropperPanel(handle, publisher))]), "Targeting")
@@ -215,12 +228,7 @@ def main() -> int:
     from ragnarok.tracking.egomotion import CommandedMotionBuffer
     cmd_buffer = CommandedMotionBuffer()
     aim_controller = _build_fire_component(cfg, cmd_buffer)
-    detector = create_detector(cfg.detection)
-    if cfg.dynamic_roi.enabled:                 # opt-in SEARCH/TRACK crop+upscale
-        from ragnarok.detection.dynamic import DynamicRoiDetector
-        from ragnarok.detection.roi import DynamicRoiPlanner
-        detector = DynamicRoiDetector(detector, DynamicRoiPlanner(cfg.dynamic_roi),
-                                      model_input_px=cfg.dynamic_roi.model_input_px)
+    detector = _build_detector(cfg)
     loop = WorkerLoop(
         create_capturer(cfg.capture), detector,
         StageProfiler(), publisher,
@@ -256,6 +264,10 @@ def main() -> int:
             new_cfg, save=_save,
             refresh=[tp.refresh for tp in tuning_panels],
             reload=reloader.reload)
+        try:                                    # cheap live threshold (no model rebuild)
+            loop.set_detector_confidence(new_cfg.detection.confidence)
+        except Exception:
+            pass
         for stage, exc in errors:
             import warnings
             warnings.warn(f"config {stage} failed (GUI kept alive): {exc}")
