@@ -42,6 +42,8 @@ class AimConfig(BaseModel):
     kp: float = Field(default=0.35, gt=0.0, le=2.0)
     max_step_px: float = Field(default=60.0, gt=0.0)
     creep_px: float = Field(default=8.0, ge=0.0)   # feedback quadratic creep zone (0=off)
+    commit: float = Field(default=0.85, gt=0.0, le=1.0)   # open-loop aimers issue commit*step
+    settle_px: float = Field(default=2.0, ge=0.0)         # deadzone: <= this error -> no move
     # Smith-predictor dead-time: the aim feedback loop's round-trip latency
     # (send->render->display->capture->detect). The controller advances the
     # crosshair by counts commanded within this window so it doesn't re-issue
