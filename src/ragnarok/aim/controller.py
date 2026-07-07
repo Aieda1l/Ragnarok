@@ -11,6 +11,8 @@ pushed to a CommandedMotionBuffer so a FeedForwardGMC can back-project them.
 """
 from __future__ import annotations
 
+import math
+
 from ragnarok.core.clock import now_ns
 from ragnarok.core.types import Tracks
 from ragnarok.aim.fov import aim_point
@@ -53,7 +55,11 @@ class AimController:
         self._active = is_aim_active
         self._cx = roi_size / 2.0
         self._cy = roi_size / 2.0
-        self._deg_per_px = cfg.hfov_deg / float(cfg.screen_width_px)
+        if getattr(cfg, "pinhole", False):
+            focal = (cfg.screen_width_px / 2.0) / math.tan(math.radians(cfg.hfov_deg / 2.0))
+            self._deg_per_px = math.degrees(1.0 / focal)   # true near-center rectilinear rate
+        else:
+            self._deg_per_px = cfg.hfov_deg / float(cfg.screen_width_px)
         self._deadtime_ns = round(float(getattr(cfg, "deadtime_ms", 0.0)) * 1e6)
         self._clock = clock
         self._shaper = shaper if shaper is not None else NullShaper()
