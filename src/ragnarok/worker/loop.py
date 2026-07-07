@@ -30,6 +30,14 @@ class WorkerLoop:
         self._measure_req: float | None = None   # requested duration_s (GIL-atomic rebind)
         self._measure_ms: float | None = None    # result, surfaced in ONE snapshot
 
+    def set_detector(self, detector) -> None:
+        """Atomically hot-swap the detector (box-only rebuild for backend/engine)."""
+        self._det = detector
+
+    def set_detector_confidence(self, conf: float) -> None:
+        """Cheap live threshold update (no model rebuild)."""
+        self._det.set_confidence(conf)
+
     def set_measure_mouse(self, mouse) -> None:
         self._measure_mouse = mouse
 
