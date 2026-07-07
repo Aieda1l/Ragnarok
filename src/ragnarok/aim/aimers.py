@@ -77,22 +77,17 @@ class NullAimer(Aimer):
 # ---------------------------------------------------------------------------
 
 class FlickAimer(Aimer):
-    """Latch-once, constant-speed aimer.
+    """Constant-speed aimer that glides toward the CURRENT target.
 
-    On the first call after construction or reset(), the *target_point* is
-    latched.  Subsequent calls ignore the target_point argument and continue
-    gliding toward the latched point at *flick_speed_px_s* px/s.
-
-    The step is clamped to the remaining distance so the crosshair never
-    overshoots.  A new target is only acquired after an explicit reset().
+    Each frame it steps toward the live *target_point* at *flick_speed_px_s* px/s,
+    clamped to the remaining distance so it never overshoots. It follows the live
+    target (not a stale latched point), so it tracks moving targets; combined with
+    the controller's Smith-predictor crosshair advance, the remaining distance
+    shrinks each frame so it settles onto the target instead of gliding open-loop.
     """
 
     def __init__(self, *, flick_speed_px_s: float) -> None:
         self._speed: float = flick_speed_px_s
-        self._latched: tuple[float, float] | None = None
-
-    def reset(self) -> None:
-        self._latched = None
 
     def step(
         self,
@@ -101,20 +96,12 @@ class FlickAimer(Aimer):
         dt: float,
         target_vel: tuple[float, float] = (0.0, 0.0),
     ) -> tuple[float, float]:
-        # Latch target_point on first call after reset (or construction).
-        if self._latched is None:
-            self._latched = target_point
-
-        tx, ty = self._latched
-        ex = tx - crosshair[0]
-        ey = ty - crosshair[1]
+        ex = target_point[0] - crosshair[0]
+        ey = target_point[1] - crosshair[1]
         d = math.hypot(ex, ey)
-
         if d <= 1e-9:
             return (0.0, 0.0)
-
-        # Glide at constant speed; clamp to remaining distance (no overshoot).
-        step_len = min(self._speed * dt, d)
+        step_len = min(self._speed * dt, d)          # clamp to remaining -> no overshoot
         return (ex / d * step_len, ey / d * step_len)
 
 

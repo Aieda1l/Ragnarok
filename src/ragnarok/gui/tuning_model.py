@@ -38,6 +38,7 @@ AIM_FIELDS: tuple[FieldSpec, ...] = (
     FieldSpec("aim.max_step_px", "Max step (px)", "float", 1.0, 300.0, 1.0),
     FieldSpec("aim.creep_px", "Creep zone (px)", "float", 0.0, 100.0, 1.0),
     FieldSpec("aim.deadtime_ms", "Latency comp (ms)", "float", 0.0, 500.0, 5.0),
+    FieldSpec("aim.pinhole", "Pinhole projection", "bool"),
     FieldSpec("aim.ema_alpha", "EMA alpha", "float", 0.01, 1.0, 0.01),
     FieldSpec("aim.aim_fov_deg", "FOV acquire (deg)", "float", 0.1, 179.0, 0.5),
     FieldSpec("aim.retain_fov_deg", "FOV retain (deg)", "float", 0.1, 179.0, 0.5),

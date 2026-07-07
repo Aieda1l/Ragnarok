@@ -28,19 +28,11 @@ def test_null_aimer_reset_is_no_op():
 # FlickAimer — latch + no overshoot
 # ---------------------------------------------------------------------------
 
-def test_flick_latches_first_target():
-    """FlickAimer glides toward the FIRST target_point; ignores later ones."""
+def test_flick_glides_toward_current_target():
+    """FlickAimer glides toward the target at flick speed, clamped to remaining."""
     a = FlickAimer(flick_speed_px_s=1000.0)
-    # First call: target at (10, 0). speed*dt = 1000*1.0 = 1000 px, clamped to d=10.
-    dx, dy = a.step((0.0, 0.0), (10.0, 0.0), dt=1.0)
-    assert abs(dx - 10.0) < 1e-6, f"Expected dx=10, got {dx}"
-    assert abs(dy) < 1e-6
-
-    # Second call: pass a different target_point — must still track latched (10,0).
-    # Crosshair is now AT (10,0), so remaining distance = 0 → step should be (0,0).
-    dx2, dy2 = a.step((10.0, 0.0), (999.0, 0.0), dt=1.0)
-    assert abs(dx2) < 1e-6, f"Should not re-acquire; latched target already reached"
-    assert abs(dy2) < 1e-6
+    dx, dy = a.step((0.0, 0.0), (10.0, 0.0), dt=1.0)   # 1000px clamped to d=10
+    assert abs(dx - 10.0) < 1e-6 and abs(dy) < 1e-6
 
 
 def test_flick_no_overshoot():
@@ -69,27 +61,13 @@ def test_flick_partial_step():
     assert abs(dy) < 1e-6
 
 
-def test_flick_stays_latched_across_multiple_steps():
-    """Even if caller keeps passing a moving target, FlickAimer ignores it."""
+def test_flick_follows_moving_target():
+    """FlickAimer tracks the LIVE target as it moves (no stale latch)."""
     a = FlickAimer(flick_speed_px_s=100.0)
-    # Latch at (50, 0)
-    a.step((0.0, 0.0), (50.0, 0.0), dt=0.1)  # advances 10 px
-    # Now target "moves" to (999, 999) — must still glide toward (50,0)
-    dx, dy = a.step((10.0, 0.0), (999.0, 999.0), dt=0.1)
-    # Remaining to latched (50,0) from (10,0) = 40 px; step = min(10, 40) = 10
-    assert abs(dx - 10.0) < 1e-6, f"Re-acquired wrong target; dx={dx}"
-    assert abs(dy) < 1e-6
-
-
-def test_flick_reacquire_after_reset():
-    """After reset(), the next step latches a NEW target_point."""
-    a = FlickAimer(flick_speed_px_s=1e9)  # huge speed -> teleports
-    a.step((0.0, 0.0), (5.0, 0.0), dt=1.0)  # latches at (5,0)
-    a.reset()
-    # Now latch a new target at (20, 0)
-    dx, dy = a.step((0.0, 0.0), (20.0, 0.0), dt=1.0)
-    assert abs(dx - 20.0) < 1e-6, f"Expected dx=20 after re-acquire, got {dx}"
-    assert abs(dy) < 1e-6
+    a.step((0.0, 0.0), (50.0, 0.0), dt=0.1)             # step 10 toward (50,0)
+    # target moved to (10, 100) — glide toward the NEW target from crosshair (10,0)
+    dx, dy = a.step((10.0, 0.0), (10.0, 100.0), dt=0.1)
+    assert abs(dx) < 1e-6 and abs(dy - 10.0) < 1e-6     # 10px toward the live target
 
 
 def test_flick_zero_distance_returns_zero():
