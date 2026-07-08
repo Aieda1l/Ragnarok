@@ -24,6 +24,7 @@ class WorkerLoop:
         self._tracker = tracker or IdentityTracker()         # defaults keep Phase 1 tests passing
         self._classifier = classifier or NullClassifier()
         self._aim = aim_controller          # optional; None keeps Phase 1/2 behavior
+        self._retired: list = []            # controllers swapped out, released on the worker thread
         self._seq = 0
         self._last_ns: int | None = None
         self._measure_mouse = None          # SendInput driver for latency measurement
@@ -49,9 +50,17 @@ class WorkerLoop:
         """Atomically hot-swap the aim controller (or None to disable aim).
 
         Single attribute rebind -> GIL-atomic; the tick loop reads self._aim
-        once per iteration, so it always sees a whole controller or None.
+        once per iteration, so it always sees a whole controller or None. The
+        outgoing controller is queued for release on the WORKER thread (next
+        tick), not released here on the GUI thread: releasing on the GUI thread
+        could interleave with the worker's in-flight TriggerBot.update and leave
+        a stuck press. Draining on the worker thread strictly orders the release
+        after any in-flight press.
         """
+        prev = self._aim
         self._aim = controller
+        if prev is not None and prev is not controller:
+            self._retired.append(prev)
 
     def set_tracker(self, tracker) -> None:
         """Atomically hot-swap the tracker (None restores the identity default).
@@ -72,6 +81,17 @@ class WorkerLoop:
         return np.ascontiguousarray(image)
 
     def tick(self) -> None:
+        # Release controllers swapped out since the last tick (on the worker thread,
+        # so a released button can't race an in-flight press). Shared mouse -> a
+        # single release un-sticks the physical button.
+        while self._retired:
+            r = self._retired.pop()
+            rel = getattr(r, "release", None)
+            if callable(rel):
+                try:
+                    rel()
+                except Exception:
+                    pass
         req = self._measure_req
         if req is not None:                      # latency measurement: blocks this tick
             self._measure_req = None
@@ -105,11 +125,19 @@ class WorkerLoop:
             aim.update(tracks, frame.t_capture_ns)
         t_aim = now_ns()
 
+        # Effective lock target for the overlay + dynamic-ROI: the aim lock, or the
+        # trigger's crosshair-target when aim assist is off (trigger-only mode), so
+        # both keep tracking the enemy under the crosshair either way.
+        lock_id = None
+        if aim is not None:
+            lock_id = getattr(aim, "target_id", None)
+            if lock_id is None:
+                lock_id = getattr(aim, "fire_target_id", None)
+
         # Dynamic-ROI feedback: tell the detector where the locked target is so the
         # NEXT frame can crop+upscale around it (no-op for the plain detector).
         if hasattr(det, "observe_lock"):
-            tid = getattr(aim, "target_id", None) if aim is not None else None
-            locked = next((t for t in tracks if t.track_id == tid), None) if tid is not None else None
+            locked = next((t for t in tracks if t.track_id == lock_id), None) if lock_id is not None else None
             det.observe_lock(locked.center if locked is not None else None,
                              locked is not None)
 
@@ -136,7 +164,7 @@ class WorkerLoop:
             fps=fps, loop_ms_p50=p50, loop_ms_p99=p99,
             detection_count=len(dets), preview=preview, seq=self._seq,
             tracks=tuple(tracks),
-            locked_target_id=getattr(aim, "target_id", None),
+            locked_target_id=lock_id,
             roi_region=frame.region,
             latency_ms=self._measure_ms,
             aim_on=getattr(aim, "aim_on", None),
