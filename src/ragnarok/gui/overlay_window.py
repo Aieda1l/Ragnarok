@@ -90,16 +90,26 @@ class FovOverlay(QWidget):
         if snap is None:
             return
         cfg = self._cfg()
-        vp = (0.0, 0.0, float(self.width()), float(self.height()))
-        scene = build_scene(snapshot=snap, cfg=cfg, viewport=vp)
-        if not scene.has_signal:
-            return
         p = QPainter(self)
         p.setRenderHint(QPainter.Antialiasing, True)
         try:
-            self._draw_scene(p, scene, cfg.overlay)
+            self._draw_status(p, snap)                 # AIM/TRIGGER ON-OFF (always shown)
+            vp = (0.0, 0.0, float(self.width()), float(self.height()))
+            scene = build_scene(snapshot=snap, cfg=cfg, viewport=vp)
+            if scene.has_signal:
+                self._draw_scene(p, scene, cfg.overlay)
         finally:
             p.end()
+
+    def _draw_status(self, p: QPainter, snap) -> None:
+        """Top-left AIM/TRIGGER toggle state so the user always knows what's armed
+        (toggles have no held-key feedback). Cyan = ON, red = OFF."""
+        aim_on = getattr(snap, "aim_on", None)
+        trig_on = getattr(snap, "trigger_on", None)
+        p.setPen(QPen(QColor(theme.CYAN if aim_on else theme.ALERT_RED), 1))
+        p.drawText(12, 20, f"AIM {'ON' if aim_on else 'OFF'}")
+        p.setPen(QPen(QColor(theme.CYAN if trig_on else theme.ALERT_RED), 1))
+        p.drawText(96, 20, f"TRIGGER {'ON' if trig_on else 'OFF'}")
 
     def _draw_scene(self, p: QPainter, scene, ov) -> None:
         cyan = QColor(theme.CYAN)

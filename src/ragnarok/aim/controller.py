@@ -77,16 +77,25 @@ class AimController:
         self._cur_target: int | None = None
         self.target_id: int | None = None          # aim lock (overlay / dynamic-ROI)
         self.fire_target_id: int | None = None      # ENEMY under the crosshair (trigger)
+        self.aim_on: bool = False                    # live auto-aim toggle state (telemetry)
+        self.trigger_on: bool = False                # live trigger toggle state (telemetry)
 
     def update(self, tracks: Tracks, t_capture_ns: int) -> None:
         self._imm.prune({t.track_id for t in tracks})
 
+        # Read each toggle/key once per tick (a toggle closure is idempotent within
+        # a tick, but reusing the value keeps the state and the gate consistent).
+        aim_active = self._active()
+        trig_active = self._trigger_active()
+        self.aim_on = bool(self._cfg.enabled and aim_active)
+        self.trigger_on = bool(self._trigger is not None and trig_active)
+
         # TRIGGER: evaluated every tick, independent of the aim key/toggle, so the
         # trigger bot fires on crosshair-over-enemy whether or not auto-aim is on.
-        self._run_trigger(tracks)
+        self._run_trigger(tracks, trig_active)
 
         # AIM ASSIST: only while aim is enabled AND its toggle/key is active.
-        if not (self._cfg.enabled and self._active()):
+        if not (self._cfg.enabled and aim_active):
             self._disengage_aim()
             return
 
@@ -155,7 +164,7 @@ class AimController:
     # ------------------------------------------------------------------
     # Trigger (independent of the aim key) + recoil
     # ------------------------------------------------------------------
-    def _run_trigger(self, tracks: Tracks) -> None:
+    def _run_trigger(self, tracks: Tracks, active: bool) -> None:
         """Fire when the crosshair sits inside an ENEMY hitbox, gated only by the
         trigger's own activation. Runs every tick regardless of aim state, so the
         trigger bot works with auto-aim off. Recoil counter-moves are emitted here
@@ -177,7 +186,7 @@ class AimController:
             occluded=target.time_since_update > 0,
             enemy_confirmed=True,           # crosshair-containment gate is ENEMY-only
             line_clear=self._line_clear(),
-            active=self._trigger_active(),
+            active=active,
         )
         if self._recoil is not None:
             rx, ry = self._recoil_delta(fired)
