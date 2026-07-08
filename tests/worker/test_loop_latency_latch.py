@@ -50,15 +50,24 @@ def test_latency_latched_across_ticks(monkeypatch):
     assert pub.latest().latency_ms == 42.0        # STILL latched (was None before)
 
 
-def test_latency_cleared_on_new_request(monkeypatch):
+def test_latency_remeasures_on_new_request(monkeypatch):
     import ragnarok.worker.loop as loopmod
-    monkeypatch.setattr(loopmod, "WallLatencyMeasurer", _Measurer)
+    seq = [0.055, 0.042]                           # popped from the end: 42 then 55
+
+    class _Seq:
+        def __init__(self, *a, **k):
+            pass
+
+        def run(self):
+            return seq.pop()
+
+    monkeypatch.setattr(loopmod, "WallLatencyMeasurer", _Seq)
     pub = SnapshotPublisher()
     loop = WorkerLoop(_Cap(), _Det(), StageProfiler(), pub)
     loop.set_measure_mouse(object())
     loop.request_latency_measure(0.1)
     loop.tick()
     assert pub.latest().latency_ms == 42.0
-    loop.request_latency_measure(0.1)             # new request resets the latch
+    loop.request_latency_measure(0.1)             # new request -> fresh measurement
     loop.tick()
-    assert pub.latest().latency_ms == 42.0        # fresh measurement re-latched
+    assert pub.latest().latency_ms == 55.0        # latch updated to the NEW value, not stale 42

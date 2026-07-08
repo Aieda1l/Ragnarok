@@ -287,13 +287,17 @@ def main() -> int:
     worker.start()
 
     def _shutdown_mouse():
-        fc = getattr(loop, "_aim", None)             # release a held fire button, then
-        rel = getattr(fc, "release", None)           # close the one shared driver
-        if callable(rel):
-            try:
-                rel()
-            except Exception:
-                pass
+        # Release the live controller AND any retired-but-undrained controllers
+        # (the worker is stopped by now, so tick() won't drain them), then close the
+        # one shared driver.
+        controllers = [getattr(loop, "_aim", None)] + list(getattr(loop, "_retired", []))
+        for fc in controllers:
+            rel = getattr(fc, "release", None)
+            if callable(rel):
+                try:
+                    rel()
+                except Exception:
+                    pass
         close = getattr(mouse, "close", None)
         if callable(close):
             try:
