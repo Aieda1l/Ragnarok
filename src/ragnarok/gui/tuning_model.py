@@ -118,11 +118,13 @@ INPUT_FIELDS: tuple[FieldSpec, ...] = (
               choices=("sendinput", "arduino")),
     FieldSpec("input.compensate_ballistics", "Compensate ptr ballistics", "bool"),
     FieldSpec("arduino.transport", "Arduino transport", "choice",
-              choices=("serial", "udp")),
+              choices=("serial", "udp", "hid")),
     FieldSpec("arduino.port", "Serial port (COM/tty)", "text"),
     FieldSpec("arduino.baud", "Baud", "int", 1200, 2000000, 100),
     FieldSpec("arduino.host", "UDP host", "text"),
     FieldSpec("arduino.udp_port", "UDP port", "int", 0, 65535, 1),
+    FieldSpec("arduino.vid", "HID vendor id", "int", 0, 0xFFFF, 1),
+    FieldSpec("arduino.hid_pid", "HID product id", "int", 0, 0xFFFF, 1),
 )
 
 DETECTION_FIELDS: tuple[FieldSpec, ...] = (
