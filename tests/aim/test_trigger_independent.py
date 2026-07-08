@@ -69,6 +69,15 @@ def test_trigger_fires_with_aim_enabled_but_key_up():
     assert len(trig.calls) == 1               # trigger still fired despite aim key up
 
 
+def test_controller_exposes_toggle_state():
+    trig = _Trig()
+    c = AimController(_cfg(enabled=True), selector=_Sel(), imm_manager=IMMManager(),
+                      aimer=None, mouse=_Mouse(), is_aim_active=lambda: True,
+                      roi_size=100, trigger=trig, trigger_active=lambda: False)
+    c.update(Tracks(items=()), t_capture_ns=0)
+    assert c.aim_on is True and c.trigger_on is False
+
+
 def test_no_enemy_under_crosshair_clears_fire_target():
     trig = _Trig()
     off = Track(track_id=9, xyxy=(0.0, 0.0, 5.0, 5.0), confidence=0.9, class_id=0, team=Team.ENEMY)

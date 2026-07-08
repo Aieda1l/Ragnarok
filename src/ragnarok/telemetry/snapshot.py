@@ -15,6 +15,8 @@ class TelemetrySnapshot:
     locked_target_id: int | None = None      # Phase 8A: current aim lock (overlay highlight)
     roi_region: tuple[int, int, int, int] | None = None  # Phase 8A: (l,t,r,b) screen coords of the ROI
     latency_ms: float | None = None          # Phase 9H: last measured round-trip latency (Calibrate)
+    aim_on: bool | None = None               # Phase 9P: auto-aim toggle state (None = no controller)
+    trigger_on: bool | None = None           # Phase 9P: trigger toggle state
 
 class SnapshotPublisher:
     """Single-writer (worker) / single-reader (GUI). publish() rebinds one
