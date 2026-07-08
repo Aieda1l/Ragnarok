@@ -19,11 +19,21 @@ class AimReloader:
 
     def reload(self, cfg) -> None:
         # The builder returns a single AimController (owns both aim assist and the
-        # independent trigger) when aim OR trigger is enabled, else None.
-        if cfg.aim.enabled or cfg.trigger.enabled:
-            self._loop.set_aim_controller(self._build(cfg, self._buf))
-        else:
-            self._loop.set_aim_controller(None)
+        # independent trigger) when aim OR trigger is enabled, else None. Build first
+        # so a failure (e.g. an invalid driver) propagates and leaves the running
+        # controller in place (the caller keeps the GUI alive). The mouse driver is
+        # owned by main() and shared, so we do NOT close it here — we only release
+        # the outgoing controller's held button so a fire doesn't stick on swap.
+        new = self._build(cfg, self._buf) if (cfg.aim.enabled or cfg.trigger.enabled) else None
+        prev = getattr(self._loop, "_aim", None)
+        self._loop.set_aim_controller(new)
+        if prev is not None:
+            rel = getattr(prev, "release", None)
+            if callable(rel):
+                try:
+                    rel()
+                except Exception:
+                    pass
 
 
 class WorkerReloader:
