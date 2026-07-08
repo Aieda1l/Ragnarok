@@ -256,9 +256,11 @@ one-shot assumption.
   the same `write()`/`open()`/`close()` contract as `SerialTransport`/`UdpTransport`,
   so `ArduinoDriver` is unchanged. Frame chunking to the report size is handled in
   the transport.
-- `ArduinoConfig.transport` gains `"hid"`; add optional `vid`/`hid_pid`
-  (defaults 0 → "auto-select the Ragnarok device by usage page"). `usage_page`
-  constant fixed in code.
+- `ArduinoConfig.transport` gains `"hid"`; add `vid`/`hid_pid` (default 0).
+  `build_arduino_transport` **requires** both to be set for the `hid` transport
+  (raises `RuntimeError` on 0, like the serial/udp guards) — no usage-page
+  auto-select, which would need enumerating all HID devices. `usage_page` is a
+  fixed code constant (0xFF00).
 - `build_arduino_transport` routes `"hid"` → `HidTransport` (guards required
   fields before the lazy import, like the others).
 - Fix §2.4 wiring: `main()` owns **one** mouse driver, injected into both the

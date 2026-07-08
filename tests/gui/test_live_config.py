@@ -49,9 +49,10 @@ def test_reload_builds_standalone_trigger_when_aim_off_trigger_on():
     assert called["n"] == 1
 
 
-def test_reload_releases_previous_controller_on_swap():
-    """Phase 9P: swapping controllers releases the old one's held button (the shared
-    mouse driver is NOT closed — it is owned by main() and reused)."""
+def test_reload_swaps_without_releasing_on_gui_thread():
+    """Phase 9P: the reloader only swaps the controller; releasing the outgoing
+    one is the worker thread's job (loop.set_aim_controller/tick), so a release
+    can't race an in-flight press on the GUI thread."""
     class _Rel:
         def __init__(self): self.released = 0
         def release(self): self.released += 1
@@ -65,7 +66,7 @@ def test_reload_releases_previous_controller_on_swap():
     cfg = AppConfig().model_copy(update={"aim": AppConfig().aim.model_copy(update={"enabled": True})})
     r.reload(cfg)
     assert loop.controller == "NEW"
-    assert prev.released == 1
+    assert prev.released == 0          # NOT released here — the worker thread does it
 
 
 def test_reload_rolls_back_on_build_failure():

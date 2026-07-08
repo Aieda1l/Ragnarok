@@ -45,6 +45,9 @@ static uint8_t crc8_buf(const uint8_t* d, uint16_t n) {
 // loop() iterations and drained once per iteration into a single HID report.
 static volatile int32_t inj_dx = 0, inj_dy = 0;
 static volatile uint8_t inj_buttons = 0;
+// Last real-mouse button mask (updated by the host-shield reader); merged with
+// inj_buttons and applied every loop() so injected clicks work on an idle hand.
+static volatile uint8_t last_real_buttons = 0;
 
 static void setButtons(uint8_t mask) {
   (mask & 0x01) ? Mouse.press(MOUSE_LEFT)   : Mouse.release(MOUSE_LEFT);
@@ -111,7 +114,7 @@ protected:
     if (len >= 3) {
       int8_t dx = (int8_t)buf[1], dy = (int8_t)buf[2];
       Mouse.move(dx, dy, (len >= 4) ? (int8_t)buf[3] : 0);   // passthrough real motion
-      setButtons((buf[0] & 0x07) | inj_buttons);              // real OR injected buttons
+      last_real_buttons = buf[0] & 0x07;                      // remember real buttons (applied in loop)
     }
   }
 };
@@ -129,4 +132,10 @@ void loop() {
   while (Serial1.available() > 0) serialParser.feed((uint8_t)Serial1.read());
   int32_t dx = inj_dx, dy = inj_dy; inj_dx = 0; inj_dy = 0;   // drain injected aim
   if (dx || dy) emitMove(dx, dy);
+  // Apply the merged (real | injected) button mask every loop, NOT only when the
+  // real mouse reports — otherwise injected clicks never fire on an idle hand and
+  // an injected release can stick until the physical mouse next moves.
+  static uint8_t applied_mask = 0;
+  uint8_t mask = last_real_buttons | inj_buttons;
+  if (mask != applied_mask) { setButtons(mask); applied_mask = mask; }
 }
