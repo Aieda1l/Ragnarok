@@ -122,8 +122,11 @@ class RecoilConfig(BaseModel):
 class TriggerConfig(BaseModel):
     model_config = ConfigDict(frozen=True)
     enabled: bool = False
-    trigger_key: str = "VK_LBUTTON"
-    activation_delay_ms: float = Field(default=80.0, ge=0.0, le=2000.0)
+    trigger_key: str = "VK_XBUTTON1"                # non-obtrusive toggle key (mouse side button)
+    activation_delay_ms: float = Field(default=35.0, ge=0.0, le=2000.0)
+    # Tolerate this many consecutive coasted (occluded) frames before the
+    # eligibility timer resets, so flickery detections still fire.
+    max_occlusion_frames: int = Field(default=2, ge=0, le=30)
     require_line_clear: bool = True
     button: Literal["left", "right", "middle"] = "left"
 

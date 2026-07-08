@@ -90,6 +90,7 @@ CLASSIFICATION_FIELDS: tuple[FieldSpec, ...] = (
 TRIGGER_FIELDS: tuple[FieldSpec, ...] = (
     FieldSpec("trigger.enabled", "Trigger bot enabled", "bool"),
     FieldSpec("trigger.activation_delay_ms", "Activation delay (ms)", "float", 0.0, 2000.0, 5.0),
+    FieldSpec("trigger.max_occlusion_frames", "Occlusion tolerance (frames)", "int", 0, 30, 1),
     FieldSpec("trigger.require_line_clear", "Require line clear", "bool"),
     FieldSpec("trigger.button", "Fire button", "choice", choices=("left", "right", "middle")),
 )
@@ -139,9 +140,9 @@ OVERLAY_FIELDS: tuple[FieldSpec, ...] = (
 )
 
 KEYBIND_FIELDS: tuple[FieldSpec, ...] = (
-    FieldSpec("aim.aim_key", "Aim key (VK_ or char)", "text"),
+    FieldSpec("aim.aim_key", "Aim toggle key (VK_ or char)", "text"),
     FieldSpec("aim.toggle", "Aim = toggle (off = hold)", "bool"),
-    FieldSpec("trigger.trigger_key", "Trigger key (VK_ or char)", "text"),
+    FieldSpec("trigger.trigger_key", "Trigger toggle key (VK_ or char)", "text"),
     FieldSpec("calibration.reset_key", "Calib reset key (VK_)", "text"),
     FieldSpec("calibration.apply_key", "Calib set-sens key (VK_)", "text"),
 )
