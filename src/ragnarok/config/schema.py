@@ -26,8 +26,8 @@ class DetectionConfig(BaseModel):
 class AimConfig(BaseModel):
     model_config = ConfigDict(frozen=True)
     enabled: bool = False
-    aim_key: str = "VK_RBUTTON"
-    toggle: bool = False                        # False = hold-to-aim
+    aim_key: str = "VK_XBUTTON2"                 # non-obtrusive toggle key (mouse side button)
+    toggle: bool = True                          # True = toggle on/off (hold-to-aim removed as default)
     hfov_deg: float = Field(default=90.0, gt=0.0, le=180.0)
     screen_width_px: int = Field(default=1920, ge=320, le=7680)
     # True rectilinear (pinhole) px->deg near the crosshair instead of the linear
@@ -55,13 +55,13 @@ class AimConfig(BaseModel):
     head_frac: float = Field(default=0.15, ge=0.0, le=1.0)
     head_class_id: int = Field(default=1, ge=0)   # detection class = head (for "detected_head")
     sensitivity: float = Field(default=0.022, gt=0.0)              # deg per mouse count
-    lead_ms: float = Field(default=40.0, ge=0.0, le=500.0)
+    lead_ms: float = Field(default=0.0, ge=0.0, le=500.0)
     # --- Phase 4 additions ---
     kff: float = Field(default=0.0, ge=0.0, le=4.0)               # feed-forward velocity gain
     vel_clamp_px_s: float = Field(default=4000.0, gt=0.0)         # v̂ saturation
     vel_smooth_alpha: float = Field(default=0.5, gt=0.0, le=1.0)  # v̂ low-pass
     hybrid_flick_dist_px: float = Field(default=20.0, gt=0.0)     # HybridAimer threshold
-    adaptive_lead: bool = True                                    # §6.5 adaptive vs fixed lead_ms
+    adaptive_lead: bool = False                                   # §6.5 adaptive vs fixed lead_ms (off = steady)
     lead_alpha: float = Field(default=0.1, gt=0.0, le=1.0)        # adaptive-lead EWMA
     # --- Phase 5A PID additions ---
     ki: float = Field(default=0.0, ge=0.0)

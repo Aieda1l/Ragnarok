@@ -14,7 +14,7 @@ def test_aim_new_defaults():
     assert a.vel_clamp_px_s == 4000.0
     assert a.vel_smooth_alpha == 0.5
     assert a.hybrid_flick_dist_px == 20.0
-    assert a.adaptive_lead is True
+    assert a.adaptive_lead is False
     assert a.lead_alpha == 0.1
 
 
