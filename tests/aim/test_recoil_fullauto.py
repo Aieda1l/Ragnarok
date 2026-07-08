@@ -38,7 +38,15 @@ class _FakeRecoil:
 
 
 def _enemy():
-    return Track(track_id=1, xyxy=(250.0, 180.0, 290.0, 300.0), confidence=0.9,
+    # box covers the ROI-centre crosshair (384/2 = 192,192) so the crosshair-
+    # containment trigger fires (Phase 9P: trigger fires on crosshair-over-enemy).
+    return Track(track_id=1, xyxy=(150.0, 150.0, 250.0, 300.0), confidence=0.9,
+                 class_id=0, team=Team.ENEMY)
+
+
+def _off_enemy():
+    # enemy away from the crosshair -> no target under it -> spray releases.
+    return Track(track_id=1, xyxy=(300.0, 300.0, 340.0, 360.0), confidence=0.9,
                  class_id=0, team=Team.ENEMY)
 
 
@@ -59,6 +67,9 @@ def _drive(rps, ticks, dt_ns):
     for _ in range(ticks):
         ac.update(Tracks((_enemy(),)), clock["t"])
         clock["t"] += dt_ns
+    # Final tick with no enemy under the crosshair -> the spray releases (Phase 9P:
+    # recoil release is driven by the trigger path, not aim-target acquisition).
+    ac.update(Tracks((_off_enemy(),)), clock["t"])
     return rec
 
 
@@ -80,8 +91,8 @@ def test_trigger_bot_is_firing_reflects_press():
     mouse.connect()
     bot = TriggerBot(mouse=mouse, activation_delay_s=0.0, clock=lambda: 0)
     assert bot.is_firing is False
-    trk = _enemy()
-    bot.update(track=trk, crosshair=(270.0, 240.0), occluded=False,
+    trk = _enemy()                                  # box (150,150,250,300)
+    bot.update(track=trk, crosshair=(200.0, 240.0), occluded=False,
                enemy_confirmed=True, line_clear=True, active=True)
     assert bot.is_firing is True
     bot.release()

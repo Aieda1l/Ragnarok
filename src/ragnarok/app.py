@@ -71,25 +71,13 @@ def _build_trigger_bot(cfg, mouse):
 
 
 def _build_fire_component(cfg, commanded_buffer):
-    """The loop's per-tick fire/aim component: AimController when aim is enabled,
-    else a standalone TriggerController when only the trigger is enabled, else None."""
-    if cfg.aim.enabled:
+    """The loop's per-tick fire/aim component. A single AimController owns both the
+    aim assist (gated by the aim key/toggle) and the trigger (fires on crosshair-
+    over-enemy every tick, independent of aim). Built whenever aim OR trigger is
+    enabled; None when neither is."""
+    if cfg.aim.enabled or cfg.trigger.enabled:
         return _build_aim_controller(cfg, commanded_buffer)
-    if cfg.trigger.enabled:
-        return _build_trigger_controller(cfg)
     return None
-
-
-def _build_trigger_controller(cfg):
-    """Standalone trigger bot (fires without aim assist) for aim-disabled use."""
-    from ragnarok.trigger.controller import TriggerController
-    from ragnarok.wiring import build_recoil
-
-    mouse = _build_mouse(cfg)
-    trigger, trigger_active = _build_trigger_bot(cfg, mouse)
-    return TriggerController(
-        cfg.aim, trigger=trigger, trigger_active=trigger_active, mouse=mouse,
-        roi_size=cfg.capture.roi_size, recoil=build_recoil(cfg))
 
 
 def _build_aim_controller(cfg, commanded_buffer):

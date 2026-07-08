@@ -58,8 +58,9 @@ def test_trigger_fires_and_advances_recoil():
     assert rc._idx > 0                                 # recoil advanced on fire
 
 
-def test_target_switch_releases_trigger():
-    """_reset_stateful runs on target switch, releasing the trigger."""
+def test_trigger_stays_engaged_across_aim_target_switch():
+    """Phase 9P: the trigger is independent of the aim-selected target. While an
+    ENEMY covers the crosshair it keeps firing even as the aim lock switches."""
     cfg = AimConfig(enabled=True)
     mouse = NullMouseDriver(); mouse.connect()
     # Two enemies both covering the crosshair (ROI centre = 192, 192).
@@ -73,31 +74,51 @@ def test_target_switch_releases_trigger():
         shaper=NullShaper(), trigger=trig, trigger_active=lambda: True,
         clock=lambda: 0,
     )
-    # Frame 1: only e1 present → selected, trigger fires.
     ac.update(Tracks((e1,)), 0)
     assert (MouseButton.LEFT, True) in mouse.buttons
-    # Frame 2: only e2 present → selector switches to tid=2 → _reset_stateful → release.
+    # Aim lock switches to tid=2, but an enemy still covers the crosshair → no release.
     ac.update(Tracks((e2,)), 8_000_000)
-    assert (MouseButton.LEFT, False) in mouse.buttons
+    assert (MouseButton.LEFT, False) not in mouse.buttons
 
 
-def test_disengage_releases_trigger():
+def test_trigger_fires_while_aim_key_up():
+    """Phase 9P: the trigger fires even when the aim key is not held (aim disengaged)."""
     cfg = AimConfig(enabled=True)
     mouse = NullMouseDriver(); mouse.connect()
     enemy = _enemy(xyxy=(150.0, 150.0, 240.0, 260.0))
     trig = TriggerBot(mouse=mouse, activation_delay_s=0.0, clock=lambda: 0)
-    active = {"v": True}
+    active = {"v": False}
     ac = AimController(
         cfg, selector=_selector(), imm_manager=IMMManager(),
         aimer=FeedbackAimer(kp=0.5, max_step_px=500.0, ema_alpha=1.0),
-        mouse=mouse, is_aim_active=lambda: active["v"], roi_size=384,
+        mouse=mouse, is_aim_active=lambda: active["v"], roi_size=384,   # aim key UP
         shaper=NullShaper(), trigger=trig, trigger_active=lambda: True,
         clock=lambda: 0,
     )
     ac.update(Tracks((enemy,)), 0)
-    active["v"] = False
-    ac.update(Tracks((enemy,)), 8_000_000)
-    assert (MouseButton.LEFT, False) in mouse.buttons   # released on disengage
+    assert (MouseButton.LEFT, True) in mouse.buttons    # fired with aim disengaged
+    assert ac.target_id is None                          # aim never locked
+    assert ac.fire_target_id == 1                        # trigger target = enemy under crosshair
+
+
+def test_trigger_releases_when_enemy_leaves_crosshair():
+    """Phase 9P: dropping off the enemy (no ENEMY under crosshair) releases the button."""
+    cfg = AimConfig(enabled=True)
+    mouse = NullMouseDriver(); mouse.connect()
+    on = _enemy(xyxy=(150.0, 150.0, 240.0, 260.0))       # covers crosshair
+    off = _enemy(xyxy=(300.0, 300.0, 340.0, 360.0))      # away from crosshair
+    trig = TriggerBot(mouse=mouse, activation_delay_s=0.0, clock=lambda: 0)
+    ac = AimController(
+        cfg, selector=_selector(), imm_manager=IMMManager(),
+        aimer=FeedbackAimer(kp=0.5, max_step_px=500.0, ema_alpha=1.0),
+        mouse=mouse, is_aim_active=lambda: True, roi_size=384,
+        shaper=NullShaper(), trigger=trig, trigger_active=lambda: True,
+        clock=lambda: 0,
+    )
+    ac.update(Tracks((on,)), 0)
+    assert (MouseButton.LEFT, True) in mouse.buttons
+    ac.update(Tracks((off,)), 8_000_000)                 # crosshair no longer on an enemy
+    assert (MouseButton.LEFT, False) in mouse.buttons     # released
 
 
 def test_phase3_constructor_still_works():
