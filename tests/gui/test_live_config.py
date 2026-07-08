@@ -49,6 +49,42 @@ def test_reload_builds_standalone_trigger_when_aim_off_trigger_on():
     assert called["n"] == 1
 
 
+def test_reload_releases_previous_controller_on_swap():
+    """Phase 9P: swapping controllers releases the old one's held button (the shared
+    mouse driver is NOT closed — it is owned by main() and reused)."""
+    class _Rel:
+        def __init__(self): self.released = 0
+        def release(self): self.released += 1
+    prev = _Rel()
+
+    class _L:
+        def __init__(self): self._aim = prev; self.controller = prev
+        def set_aim_controller(self, c): self._aim = c; self.controller = c
+    loop = _L()
+    r = AimReloader(loop, build_aim=lambda cfg, buf: "NEW")
+    cfg = AppConfig().model_copy(update={"aim": AppConfig().aim.model_copy(update={"enabled": True})})
+    r.reload(cfg)
+    assert loop.controller == "NEW"
+    assert prev.released == 1
+
+
+def test_reload_rolls_back_on_build_failure():
+    import pytest
+
+    class _L:
+        def __init__(self): self.controller = "OLD"; self._aim = "OLD"
+        def set_aim_controller(self, c): self.controller = c; self._aim = c
+    loop = _L()
+
+    def boom(cfg, buf):
+        raise RuntimeError("arduino port busy")
+    r = AimReloader(loop, build_aim=boom)
+    cfg = AppConfig().model_copy(update={"aim": AppConfig().aim.model_copy(update={"enabled": True})})
+    with pytest.raises(RuntimeError):
+        r.reload(cfg)
+    assert loop.controller == "OLD"        # build raised before the swap -> old kept
+
+
 from ragnarok.gui.live_config import WorkerReloader
 
 
