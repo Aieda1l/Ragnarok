@@ -132,6 +132,8 @@ class WorkerLoop:
             locked_target_id=getattr(aim, "target_id", None),
             roi_region=frame.region,
             latency_ms=self._measure_ms,
+            aim_on=getattr(aim, "aim_on", None),
+            trigger_on=getattr(aim, "trigger_on", None),
         ))
         self._measure_ms = None                  # surface a measurement in exactly one snapshot
 
