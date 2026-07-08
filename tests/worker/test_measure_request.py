@@ -31,7 +31,7 @@ class _Prof:
         return (0.0, 0.0)
 
 
-def test_measure_request_runs_and_publishes_once(monkeypatch):
+def test_measure_request_runs_and_latches(monkeypatch):
     pub = SnapshotPublisher()
     loop = WorkerLoop(_Cap(), _Det(), _Prof(), pub)
     loop.set_measure_mouse(_Mouse())
@@ -44,4 +44,5 @@ def test_measure_request_runs_and_publishes_once(monkeypatch):
     assert snap is not None and snap.latency_ms == 37.0        # 0.037 s -> 37.0 ms
 
     loop.tick()                                                # request already consumed
-    assert pub.latest().latency_ms is None                     # only ONE snapshot carries it
+    # Phase 9P: the result is LATCHED so the 200ms-polling Calibrate GUI can catch it.
+    assert pub.latest().latency_ms == 37.0
