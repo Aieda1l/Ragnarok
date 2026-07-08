@@ -248,3 +248,12 @@ class AimController:
         self._last_ns = None
         self._cur_target = None
         self.target_id = None
+
+    def release(self) -> None:
+        """Release any held trigger button (and reset the spray). Called on hot-swap
+        so a held fire doesn't stick when this controller is replaced. Does NOT close
+        the mouse driver — that is owned and shared by the app."""
+        if self._trigger is not None:
+            self._trigger.release()
+        if self._recoil is not None:
+            self._recoil.release()

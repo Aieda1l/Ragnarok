@@ -64,23 +64,25 @@ def _build_trigger_bot(cfg, mouse):
            "middle": MouseButton.MIDDLE}[cfg.trigger.button]
     trigger = TriggerBot(mouse=mouse,
                          activation_delay_s=cfg.trigger.activation_delay_ms / 1000.0,
-                         button=btn)
+                         button=btn,
+                         max_occlusion_frames=cfg.trigger.max_occlusion_frames)
+    # Trigger is a toggle on its own non-obtrusive key (press to arm/disarm).
     trigger_active = make_aim_active(
-        AsyncKeyStateProvider(cfg.trigger.trigger_key), toggle=False)
+        AsyncKeyStateProvider(cfg.trigger.trigger_key), toggle=True)
     return trigger, trigger_active
 
 
-def _build_fire_component(cfg, commanded_buffer):
+def _build_fire_component(cfg, commanded_buffer, mouse):
     """The loop's per-tick fire/aim component. A single AimController owns both the
     aim assist (gated by the aim key/toggle) and the trigger (fires on crosshair-
     over-enemy every tick, independent of aim). Built whenever aim OR trigger is
-    enabled; None when neither is."""
+    enabled; None when neither is. The mouse driver is injected (owned by main())."""
     if cfg.aim.enabled or cfg.trigger.enabled:
-        return _build_aim_controller(cfg, commanded_buffer)
+        return _build_aim_controller(cfg, commanded_buffer, mouse)
     return None
 
 
-def _build_aim_controller(cfg, commanded_buffer):
+def _build_aim_controller(cfg, commanded_buffer, mouse):
     """Build the AimController from cfg (Windows-only deps imported lazily).
 
     Wires the Phase 4 collaborators: selected aimer, motion shaper, velocity
@@ -103,7 +105,6 @@ def _build_aim_controller(cfg, commanded_buffer):
                               dwell_ms=a.dwell_ms, switch_margin=a.switch_margin,
                               head_frac=a.head_frac,
                               head_class_id=a.head_class_id if a.aim_point == "detected_head" else None)
-    mouse = _build_mouse(cfg)
     is_active = make_aim_active(AsyncKeyStateProvider(a.aim_key), toggle=a.toggle)
     trigger, trigger_active = _build_trigger_bot(cfg, mouse)
 
@@ -215,7 +216,12 @@ def main() -> int:
             warnings.warn("GMC 'feedforward' is enabled but inert: " + "; ".join(reasons))
     from ragnarok.tracking.egomotion import CommandedMotionBuffer
     cmd_buffer = CommandedMotionBuffer()
-    aim_controller = _build_fire_component(cfg, cmd_buffer)
+    # ONE mouse driver, owned here and shared into the fire component, the latency
+    # measure, and every live rebuild. Building a second driver (the old code did,
+    # for the measure path) double-opened an exclusive Arduino COM port and crashed
+    # startup; rebuilding one per reload re-opened the port and failed every edit.
+    mouse = _build_mouse(cfg)
+    aim_controller = _build_fire_component(cfg, cmd_buffer, mouse)
     detector = _build_detector(cfg)
     loop = WorkerLoop(
         create_capturer(cfg.capture), detector,
@@ -225,11 +231,15 @@ def main() -> int:
         classifier=build_classifier(cfg),
         aim_controller=aim_controller,
     )
-    loop.set_measure_mouse(_build_mouse(cfg))       # for the Calibrate-tab latency measure
+    loop.set_measure_mouse(mouse)                   # SAME driver — no second port open
     # Live config: the tuning panel edits funnel through ConfigHandle.swap and
     # rebuild the aim controller in-place (spec §13 immutable snapshot swap).
     handle = ConfigHandle(cfg)
-    aim_reloader = AimReloader(loop, _build_fire_component, commanded_buffer=cmd_buffer)
+    # Every rebuild reuses the shared mouse (driver-switch needs a restart; all other
+    # aim/trigger/motion/recoil edits reload live without re-opening the port).
+    aim_reloader = AimReloader(
+        loop, lambda c, buf: _build_fire_component(c, buf, mouse),
+        commanded_buffer=cmd_buffer)
     reloader = WorkerReloader(
         loop, aim_reloader=aim_reloader,
         build_tracker=build_tracker, build_classifier=build_classifier,
@@ -275,7 +285,24 @@ def main() -> int:
     overlay.resize(cfg.aim.screen_width_px, int(cfg.aim.screen_width_px * 9 / 16))
     overlay.show()
     worker.start()
+
+    def _shutdown_mouse():
+        fc = getattr(loop, "_aim", None)             # release a held fire button, then
+        rel = getattr(fc, "release", None)           # close the one shared driver
+        if callable(rel):
+            try:
+                rel()
+            except Exception:
+                pass
+        close = getattr(mouse, "close", None)
+        if callable(close):
+            try:
+                close()
+            except Exception:
+                pass
+
     app.aboutToQuit.connect(worker.stop)
+    app.aboutToQuit.connect(_shutdown_mouse)
     return app.exec()
 
 if __name__ == "__main__":
