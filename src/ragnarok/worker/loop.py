@@ -79,12 +79,18 @@ class WorkerLoop:
             if self._measure_mouse is not None:
                 lag = WallLatencyMeasurer(self._cap, self._measure_mouse, duration_s=req).run()
                 self._measure_ms = round(lag * 1000.0, 1) if lag is not None else None
+        # Snapshot the detector ONCE: the GUI thread may hot-swap self._det (e.g.
+        # a DynamicRoiDetector -> plain detector) at any moment, so reading it for
+        # detect() and for the observe_lock feature-check separately would be a
+        # TOCTOU race (the second read could miss observe_lock -> AttributeError
+        # kills the worker thread). Same pattern as the aim snapshot below.
+        det = self._det
         t0 = now_ns()
         frame = self._cap.grab()
         t_cap = now_ns()
         if frame is None:
             return
-        dets = self._det.detect(frame)
+        dets = det.detect(frame)
         t_inf = now_ns()
         tracks = self._tracker.update(dets, frame)   # frame carries t_capture_ns for GMC
         t_trk = now_ns()
@@ -101,11 +107,11 @@ class WorkerLoop:
 
         # Dynamic-ROI feedback: tell the detector where the locked target is so the
         # NEXT frame can crop+upscale around it (no-op for the plain detector).
-        if hasattr(self._det, "observe_lock"):
+        if hasattr(det, "observe_lock"):
             tid = getattr(aim, "target_id", None) if aim is not None else None
             locked = next((t for t in tracks if t.track_id == tid), None) if tid is not None else None
-            self._det.observe_lock(locked.center if locked is not None else None,
-                                   locked is not None)
+            det.observe_lock(locked.center if locked is not None else None,
+                             locked is not None)
 
         self._profiler.record("capture", t_cap - t0)
         self._profiler.record("infer", t_inf - t_cap)
@@ -144,6 +150,11 @@ class WorkerLoop:
         self._cap.start()
         try:
             while not stop_event.is_set():
-                self.tick()
+                try:
+                    self.tick()
+                except Exception:                # a hot-swap race / transient error
+                    import traceback
+                    import warnings
+                    warnings.warn("worker tick failed:\n" + traceback.format_exc())
         finally:
             self._cap.stop()
