@@ -44,8 +44,9 @@ def test_recoil_defaults_and_pattern():
 def test_trigger_defaults():
     t = TriggerConfig()
     assert t.enabled is False
-    assert t.trigger_key == "VK_LBUTTON"
-    assert t.activation_delay_ms == 80.0
+    assert t.trigger_key == "VK_XBUTTON1"          # Phase 9P: non-obtrusive toggle key
+    assert t.activation_delay_ms == 35.0           # Phase 9P: short, reliable reaction delay
+    assert t.max_occlusion_frames == 2             # Phase 9P: tolerate brief tracking gaps
     assert t.require_line_clear is True
     assert t.button == "left"
 
