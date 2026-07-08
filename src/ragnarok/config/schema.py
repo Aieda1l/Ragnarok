@@ -166,11 +166,14 @@ class TrainingConfig(BaseModel):
 
 class ArduinoConfig(BaseModel):
     model_config = ConfigDict(frozen=True)
-    transport: Literal["serial", "udp"] = "serial"
+    transport: Literal["serial", "udp", "hid"] = "serial"
     port: str = ""                                  # COM/tty for the serial transport
     baud: int = Field(default=115200, ge=1200)      # ignored on R4 native USB; for bridges
     host: str = ""                                  # IP for the UDP/WiFi transport
     udp_port: int = Field(default=0, ge=0, le=65535)
+    # Raw-HID (vendor OUTPUT report) command channel — driverless, no COM port.
+    vid: int = Field(default=0, ge=0, le=0xFFFF)    # USB vendor id of the device
+    hid_pid: int = Field(default=0, ge=0, le=0xFFFF)  # USB product id (hid transport)
 
 
 class InputConfig(BaseModel):
