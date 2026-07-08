@@ -103,3 +103,31 @@ def test_explicit_release():
     assert (MouseButton.LEFT, False) in mouse.buttons
     clk.t = 1_000_000_000
     assert bot.update(**_gates()) is True           # fires again after release
+
+
+def test_brief_occlusion_does_not_reset_eligibility():
+    """Phase 9P: up to max_occlusion_frames coasted frames keep the eligibility timer."""
+    clk = _Clock()
+    mouse = NullMouseDriver()
+    mouse.connect()
+    bot = TriggerBot(mouse=mouse, activation_delay_s=0.05, max_occlusion_frames=2, clock=clk)
+    g = dict(track=_track(), crosshair=(150.0, 150.0), enemy_confirmed=True,
+             line_clear=True, active=True)
+    assert bot.update(occluded=False, **g) is False   # t=0: eligibility starts
+    clk.t = 30_000_000                                 # 30 ms — 1 occluded frame, tolerated
+    assert bot.update(occluded=True, **g) is False
+    clk.t = 60_000_000                                 # 60 ms >= 50 ms — 2 occluded, still tolerated
+    assert bot.update(occluded=True, **g) is True      # delay elapsed -> fires
+
+
+def test_occlusion_beyond_tolerance_resets():
+    """Phase 9P: exceeding the tolerance drops readiness and releases."""
+    clk = _Clock()
+    mouse = NullMouseDriver()
+    mouse.connect()
+    bot = TriggerBot(mouse=mouse, activation_delay_s=0.0, max_occlusion_frames=1, clock=clk)
+    g = dict(track=_track(), crosshair=(150.0, 150.0), enemy_confirmed=True,
+             line_clear=True, active=True)
+    assert bot.update(occluded=True, **g) is True      # 1 occluded (<=1), delay 0 -> fires
+    assert bot.update(occluded=True, **g) is False      # 2 consecutive (>1) -> not ready
+    assert bot.is_firing is False
