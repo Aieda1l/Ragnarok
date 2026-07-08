@@ -43,6 +43,7 @@ class WorkerLoop:
 
     def request_latency_measure(self, duration_s: float = 2.5) -> None:
         self._measure_req = float(duration_s)    # consumed once at the top of tick()
+        self._measure_ms = None                  # reset the latch for the fresh measurement
 
     def set_aim_controller(self, controller) -> None:
         """Atomically hot-swap the aim controller (or None to disable aim).
@@ -135,7 +136,9 @@ class WorkerLoop:
             aim_on=getattr(aim, "aim_on", None),
             trigger_on=getattr(aim, "trigger_on", None),
         ))
-        self._measure_ms = None                  # surface a measurement in exactly one snapshot
+        # NOTE: latency_ms is LATCHED — it persists in every snapshot until the next
+        # request_latency_measure resets it. The Calibrate panel polls at 200 ms, so a
+        # one-tick lifetime (the old behaviour) was caught only ~3% of the time.
 
     def run(self, stop_event: threading.Event) -> None:
         self._cap.start()
