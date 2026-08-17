@@ -90,8 +90,9 @@ class WorkerLoop:
             if callable(rel):
                 try:
                     rel()
-                except Exception:
-                    pass
+                except Exception as e:
+                    import warnings
+                    warnings.warn(f"retired controller release failed: {e}")
         req = self._measure_req
         if req is not None:                      # latency measurement: blocks this tick
             self._measure_req = None
