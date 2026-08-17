@@ -17,7 +17,7 @@ class WorkerThread(QThread):
         # frame; a static screen never delivers one) unblocks and run() can exit
         # instead of hanging the 2 s join and aborting on a live QThread.
         try:
-            self._loop._cap.stop()
+            self._loop.stop_capture()
         except Exception:
             pass
         self.wait(2000)

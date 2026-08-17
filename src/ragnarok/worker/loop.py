@@ -42,6 +42,9 @@ class WorkerLoop:
     def set_measure_mouse(self, mouse) -> None:
         self._measure_mouse = mouse
 
+    def stop_capture(self) -> None:
+        self._cap.stop()
+
     def request_latency_measure(self, duration_s: float = 2.5) -> None:
         self._measure_req = float(duration_s)    # consumed once at the top of tick()
         self._measure_ms = None                  # reset the latch for the fresh measurement
