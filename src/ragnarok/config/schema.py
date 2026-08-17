@@ -26,8 +26,8 @@ class DetectionConfig(BaseModel):
 class AimConfig(BaseModel):
     model_config = ConfigDict(frozen=True)
     enabled: bool = False
-    aim_key: str = "VK_RBUTTON"
-    toggle: bool = False                        # False = hold-to-aim
+    aim_key: str = "VK_XBUTTON2"                 # non-obtrusive toggle key (mouse side button)
+    toggle: bool = True                          # True = toggle on/off (hold-to-aim removed as default)
     hfov_deg: float = Field(default=90.0, gt=0.0, le=180.0)
     screen_width_px: int = Field(default=1920, ge=320, le=7680)
     # True rectilinear (pinhole) px->deg near the crosshair instead of the linear
@@ -42,6 +42,8 @@ class AimConfig(BaseModel):
     kp: float = Field(default=0.35, gt=0.0, le=2.0)
     max_step_px: float = Field(default=60.0, gt=0.0)
     creep_px: float = Field(default=8.0, ge=0.0)   # feedback quadratic creep zone (0=off)
+    commit: float = Field(default=0.85, gt=0.0, le=1.0)   # open-loop aimers issue commit*step
+    settle_px: float = Field(default=2.0, ge=0.0)         # deadzone: <= this error -> no move
     # Smith-predictor dead-time: the aim feedback loop's round-trip latency
     # (send->render->display->capture->detect). The controller advances the
     # crosshair by counts commanded within this window so it doesn't re-issue
@@ -53,13 +55,13 @@ class AimConfig(BaseModel):
     head_frac: float = Field(default=0.15, ge=0.0, le=1.0)
     head_class_id: int = Field(default=1, ge=0)   # detection class = head (for "detected_head")
     sensitivity: float = Field(default=0.022, gt=0.0)              # deg per mouse count
-    lead_ms: float = Field(default=40.0, ge=0.0, le=500.0)
+    lead_ms: float = Field(default=0.0, ge=0.0, le=500.0)
     # --- Phase 4 additions ---
     kff: float = Field(default=0.0, ge=0.0, le=4.0)               # feed-forward velocity gain
     vel_clamp_px_s: float = Field(default=4000.0, gt=0.0)         # v̂ saturation
     vel_smooth_alpha: float = Field(default=0.5, gt=0.0, le=1.0)  # v̂ low-pass
     hybrid_flick_dist_px: float = Field(default=20.0, gt=0.0)     # HybridAimer threshold
-    adaptive_lead: bool = True                                    # §6.5 adaptive vs fixed lead_ms
+    adaptive_lead: bool = False                                   # §6.5 adaptive vs fixed lead_ms (off = steady)
     lead_alpha: float = Field(default=0.1, gt=0.0, le=1.0)        # adaptive-lead EWMA
     # --- Phase 5A PID additions ---
     ki: float = Field(default=0.0, ge=0.0)
@@ -120,8 +122,11 @@ class RecoilConfig(BaseModel):
 class TriggerConfig(BaseModel):
     model_config = ConfigDict(frozen=True)
     enabled: bool = False
-    trigger_key: str = "VK_LBUTTON"
-    activation_delay_ms: float = Field(default=80.0, ge=0.0, le=2000.0)
+    trigger_key: str = "VK_XBUTTON1"                # non-obtrusive toggle key (mouse side button)
+    activation_delay_ms: float = Field(default=35.0, ge=0.0, le=2000.0)
+    # Tolerate this many consecutive coasted (occluded) frames before the
+    # eligibility timer resets, so flickery detections still fire.
+    max_occlusion_frames: int = Field(default=2, ge=0, le=30)
     require_line_clear: bool = True
     button: Literal["left", "right", "middle"] = "left"
 
@@ -161,11 +166,14 @@ class TrainingConfig(BaseModel):
 
 class ArduinoConfig(BaseModel):
     model_config = ConfigDict(frozen=True)
-    transport: Literal["serial", "udp"] = "serial"
+    transport: Literal["serial", "udp", "hid"] = "serial"
     port: str = ""                                  # COM/tty for the serial transport
     baud: int = Field(default=115200, ge=1200)      # ignored on R4 native USB; for bridges
     host: str = ""                                  # IP for the UDP/WiFi transport
     udp_port: int = Field(default=0, ge=0, le=65535)
+    # Raw-HID (vendor OUTPUT report) command channel — driverless, no COM port.
+    vid: int = Field(default=0, ge=0, le=0xFFFF)    # USB vendor id of the device
+    hid_pid: int = Field(default=0, ge=0, le=0xFFFF)  # USB product id (hid transport)
 
 
 class InputConfig(BaseModel):

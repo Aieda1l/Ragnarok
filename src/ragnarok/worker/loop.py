@@ -24,6 +24,7 @@ class WorkerLoop:
         self._tracker = tracker or IdentityTracker()         # defaults keep Phase 1 tests passing
         self._classifier = classifier or NullClassifier()
         self._aim = aim_controller          # optional; None keeps Phase 1/2 behavior
+        self._retired: list = []            # controllers swapped out, released on the worker thread
         self._seq = 0
         self._last_ns: int | None = None
         self._measure_mouse = None          # SendInput driver for latency measurement
@@ -41,16 +42,28 @@ class WorkerLoop:
     def set_measure_mouse(self, mouse) -> None:
         self._measure_mouse = mouse
 
+    def stop_capture(self) -> None:
+        self._cap.stop()
+
     def request_latency_measure(self, duration_s: float = 2.5) -> None:
         self._measure_req = float(duration_s)    # consumed once at the top of tick()
+        self._measure_ms = None                  # reset the latch for the fresh measurement
 
     def set_aim_controller(self, controller) -> None:
         """Atomically hot-swap the aim controller (or None to disable aim).
 
         Single attribute rebind -> GIL-atomic; the tick loop reads self._aim
-        once per iteration, so it always sees a whole controller or None.
+        once per iteration, so it always sees a whole controller or None. The
+        outgoing controller is queued for release on the WORKER thread (next
+        tick), not released here on the GUI thread: releasing on the GUI thread
+        could interleave with the worker's in-flight TriggerBot.update and leave
+        a stuck press. Draining on the worker thread strictly orders the release
+        after any in-flight press.
         """
+        prev = self._aim
         self._aim = controller
+        if prev is not None and prev is not controller:
+            self._retired.append(prev)
 
     def set_tracker(self, tracker) -> None:
         """Atomically hot-swap the tracker (None restores the identity default).
@@ -71,6 +84,18 @@ class WorkerLoop:
         return np.ascontiguousarray(image)
 
     def tick(self) -> None:
+        # Release controllers swapped out since the last tick (on the worker thread,
+        # so a released button can't race an in-flight press). Shared mouse -> a
+        # single release un-sticks the physical button.
+        while self._retired:
+            r = self._retired.pop()
+            rel = getattr(r, "release", None)
+            if callable(rel):
+                try:
+                    rel()
+                except Exception as e:
+                    import warnings
+                    warnings.warn(f"retired controller release failed: {e}")
         req = self._measure_req
         if req is not None:                      # latency measurement: blocks this tick
             self._measure_req = None
@@ -78,12 +103,18 @@ class WorkerLoop:
             if self._measure_mouse is not None:
                 lag = WallLatencyMeasurer(self._cap, self._measure_mouse, duration_s=req).run()
                 self._measure_ms = round(lag * 1000.0, 1) if lag is not None else None
+        # Snapshot the detector ONCE: the GUI thread may hot-swap self._det (e.g.
+        # a DynamicRoiDetector -> plain detector) at any moment, so reading it for
+        # detect() and for the observe_lock feature-check separately would be a
+        # TOCTOU race (the second read could miss observe_lock -> AttributeError
+        # kills the worker thread). Same pattern as the aim snapshot below.
+        det = self._det
         t0 = now_ns()
         frame = self._cap.grab()
         t_cap = now_ns()
         if frame is None:
             return
-        dets = self._det.detect(frame)
+        dets = det.detect(frame)
         t_inf = now_ns()
         tracks = self._tracker.update(dets, frame)   # frame carries t_capture_ns for GMC
         t_trk = now_ns()
@@ -98,13 +129,21 @@ class WorkerLoop:
             aim.update(tracks, frame.t_capture_ns)
         t_aim = now_ns()
 
+        # Effective lock target for the overlay + dynamic-ROI: the aim lock, or the
+        # trigger's crosshair-target when aim assist is off (trigger-only mode), so
+        # both keep tracking the enemy under the crosshair either way.
+        lock_id = None
+        if aim is not None:
+            lock_id = getattr(aim, "target_id", None)
+            if lock_id is None:
+                lock_id = getattr(aim, "fire_target_id", None)
+
         # Dynamic-ROI feedback: tell the detector where the locked target is so the
         # NEXT frame can crop+upscale around it (no-op for the plain detector).
-        if hasattr(self._det, "observe_lock"):
-            tid = getattr(aim, "target_id", None) if aim is not None else None
-            locked = next((t for t in tracks if t.track_id == tid), None) if tid is not None else None
-            self._det.observe_lock(locked.center if locked is not None else None,
-                                   locked is not None)
+        if hasattr(det, "observe_lock"):
+            locked = next((t for t in tracks if t.track_id == lock_id), None) if lock_id is not None else None
+            det.observe_lock(locked.center if locked is not None else None,
+                             locked is not None)
 
         self._profiler.record("capture", t_cap - t0)
         self._profiler.record("infer", t_inf - t_cap)
@@ -129,16 +168,27 @@ class WorkerLoop:
             fps=fps, loop_ms_p50=p50, loop_ms_p99=p99,
             detection_count=len(dets), preview=preview, seq=self._seq,
             tracks=tuple(tracks),
-            locked_target_id=getattr(aim, "target_id", None),
+            locked_target_id=lock_id,
             roi_region=frame.region,
             latency_ms=self._measure_ms,
+            aim_on=getattr(aim, "aim_on", None),
+            trigger_on=getattr(aim, "trigger_on", None),
         ))
-        self._measure_ms = None                  # surface a measurement in exactly one snapshot
+        # NOTE: latency_ms is LATCHED — it persists in every snapshot until the next
+        # request_latency_measure resets it. The Calibrate panel polls at 200 ms, so a
+        # one-tick lifetime (the old behaviour) was caught only ~3% of the time.
 
     def run(self, stop_event: threading.Event) -> None:
         self._cap.start()
         try:
             while not stop_event.is_set():
-                self.tick()
+                try:
+                    self.tick()
+                except Exception:                # a hot-swap race / transient error
+                    import time
+                    import traceback
+                    import warnings
+                    warnings.warn("worker tick failed:\n" + traceback.format_exc())
+                    time.sleep(0.05)
         finally:
             self._cap.stop()

@@ -11,10 +11,10 @@ class TestAimConfigDefaults:
         assert AimConfig().enabled is False
 
     def test_aim_key_default(self):
-        assert AimConfig().aim_key == "VK_RBUTTON"
+        assert AimConfig().aim_key == "VK_XBUTTON2"
 
-    def test_toggle_default_false(self):
-        assert AimConfig().toggle is False
+    def test_toggle_default_true(self):
+        assert AimConfig().toggle is True
 
     def test_hfov_deg_default(self):
         assert AimConfig().hfov_deg == 90.0
@@ -59,7 +59,7 @@ class TestAimConfigDefaults:
         assert AimConfig().sensitivity == 0.022
 
     def test_lead_ms_default(self):
-        assert AimConfig().lead_ms == 40.0
+        assert AimConfig().lead_ms == 0.0
 
 
 class TestAimConfigFrozen:

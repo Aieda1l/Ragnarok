@@ -49,6 +49,43 @@ def test_reload_builds_standalone_trigger_when_aim_off_trigger_on():
     assert called["n"] == 1
 
 
+def test_reload_swaps_without_releasing_on_gui_thread():
+    """Phase 9P: the reloader only swaps the controller; releasing the outgoing
+    one is the worker thread's job (loop.set_aim_controller/tick), so a release
+    can't race an in-flight press on the GUI thread."""
+    class _Rel:
+        def __init__(self): self.released = 0
+        def release(self): self.released += 1
+    prev = _Rel()
+
+    class _L:
+        def __init__(self): self._aim = prev; self.controller = prev
+        def set_aim_controller(self, c): self._aim = c; self.controller = c
+    loop = _L()
+    r = AimReloader(loop, build_aim=lambda cfg, buf: "NEW")
+    cfg = AppConfig().model_copy(update={"aim": AppConfig().aim.model_copy(update={"enabled": True})})
+    r.reload(cfg)
+    assert loop.controller == "NEW"
+    assert prev.released == 0          # NOT released here — the worker thread does it
+
+
+def test_reload_rolls_back_on_build_failure():
+    import pytest
+
+    class _L:
+        def __init__(self): self.controller = "OLD"; self._aim = "OLD"
+        def set_aim_controller(self, c): self.controller = c; self._aim = c
+    loop = _L()
+
+    def boom(cfg, buf):
+        raise RuntimeError("arduino port busy")
+    r = AimReloader(loop, build_aim=boom)
+    cfg = AppConfig().model_copy(update={"aim": AppConfig().aim.model_copy(update={"enabled": True})})
+    with pytest.raises(RuntimeError):
+        r.reload(cfg)
+    assert loop.controller == "OLD"        # build raised before the swap -> old kept
+
+
 from ragnarok.gui.live_config import WorkerReloader
 
 

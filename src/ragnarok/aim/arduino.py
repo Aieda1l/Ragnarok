@@ -95,12 +95,57 @@ class UdpTransport:  # pragma: no cover — box-only (real socket peer)
             self._sock.close()
 
 
+_HID_REPORT_LEN = 64          # fixed OUTPUT report size (must match the firmware)
+_HID_USAGE_PAGE = 0xFF00      # vendor-defined
+
+
+class HidTransport:  # pragma: no cover paths marked below — real device I/O is box-only
+    """PC->Arduino command channel over a vendor HID OUTPUT report (driverless).
+
+    Carries the same MAKCU frame as the serial/UDP transports, prefixed with HID
+    report-id 0x00 and padded to a fixed report length. The real device open uses
+    hidapi (lazy import, box-only); tests inject ``self._dev``. This is the
+    "both directions over HID" path — no COM port to enumerate.
+    """
+
+    def __init__(self, vid: int, pid: int, *, usage_page: int = _HID_USAGE_PAGE,
+                 report_len: int = _HID_REPORT_LEN) -> None:
+        self._vid, self._pid, self._usage = vid, pid, usage_page
+        self._len = report_len
+        self._dev = None
+
+    def open(self) -> None:  # pragma: no cover — box-only (real hidapi)
+        import hid  # lazy: optional box-only dependency (`pip install hidapi`)
+        self._dev = hid.device()
+        self._dev.open(self._vid, self._pid)
+        self._dev.set_nonblocking(1)
+
+    def write(self, data: bytes) -> None:
+        if self._dev is None:
+            raise RuntimeError("HID device not opened; call open() before write()")
+        if len(data) > self._len:
+            # chunk oversized frames across reports (rare; a MOVE frame is small)
+            for i in range(0, len(data), self._len):
+                self.write(data[i:i + self._len])
+            return
+        report = bytes([0x00]) + bytes(data) + bytes(self._len - len(data))
+        self._dev.write(report)
+
+    def close(self) -> None:
+        if self._dev is not None:
+            self._dev.close()
+
+
 def build_arduino_transport(cfg):
     a = cfg.arduino
     if a.transport == "serial":
         if not a.port:
             raise RuntimeError("arduino.port must be set for the serial transport")
         return SerialTransport(a.port, a.baud)
+    if a.transport == "hid":
+        if not a.vid or not a.hid_pid:
+            raise RuntimeError("arduino.vid and arduino.hid_pid must be set for the hid transport")
+        return HidTransport(a.vid, a.hid_pid)
     if not a.host or not a.udp_port:
         raise RuntimeError("arduino.host and arduino.udp_port must be set for the udp transport")
     return UdpTransport(a.host, a.udp_port)
