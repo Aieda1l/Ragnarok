@@ -48,6 +48,30 @@ VK: dict[str, int] = {
 }
 
 
+def resolve_vk(key_name: str) -> int:
+    """Resolve a configured keybind to a Windows virtual-key code.
+
+    Accepts either a ``VK_*`` name from :data:`VK` or a single character —
+    ``A``-``Z`` and ``0``-``9`` are their own virtual-key codes on Windows
+    (0x41-0x5A and 0x30-0x39, identical to ASCII). Both forms are
+    case-insensitive and tolerate surrounding whitespace, matching the
+    "VK_ or char" contract the GUI keybind fields advertise.
+
+    Raises:
+        KeyError: if the name is neither a known ``VK_*`` entry nor a single
+            alphanumeric character. The message names the offending value.
+    """
+    name = key_name.strip().upper()
+    if name in VK:
+        return VK[name]
+    if len(name) == 1 and (name.isdigit() or "A" <= name <= "Z"):
+        return ord(name)
+    raise KeyError(
+        f"unknown keybind {key_name!r}: expected a single letter/digit "
+        f"(e.g. 'T', '5') or one of {', '.join(sorted(VK))}"
+    )
+
+
 # ---------------------------------------------------------------------------
 # Abstract base
 # ---------------------------------------------------------------------------
@@ -89,7 +113,7 @@ class AsyncKeyStateProvider(AimKeyProvider):
     def __init__(self, key_name: str) -> None:
         import ctypes  # noqa: PLC0415 — intentionally lazy
 
-        self._vk: int = VK[key_name]
+        self._vk: int = resolve_vk(key_name)
         user32 = ctypes.WinDLL("user32", use_last_error=True)
         self._get_async_key_state = user32.GetAsyncKeyState
 

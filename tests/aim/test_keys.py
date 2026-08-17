@@ -13,6 +13,7 @@ from ragnarok.aim.keys import (
     FakeKeyProvider,
     VK,
     make_aim_active,
+    resolve_vk,
 )
 
 
@@ -30,6 +31,67 @@ def test_vk_lbutton():
 
 def test_vk_mbutton():
     assert VK["VK_MBUTTON"] == 0x04
+
+
+# ---------------------------------------------------------------------------
+# resolve_vk — the "VK_ or char" contract the GUI keybind fields advertise
+# ---------------------------------------------------------------------------
+
+def test_resolve_vk_table_name():
+    assert resolve_vk("VK_RBUTTON") == 0x02
+
+
+def test_resolve_vk_letter():
+    """A single letter is a valid keybind: A-Z are VK 0x41-0x5A."""
+    assert resolve_vk("T") == 0x54
+
+
+def test_resolve_vk_letter_is_case_insensitive():
+    assert resolve_vk("t") == resolve_vk("T") == 0x54
+
+
+def test_resolve_vk_digit():
+    """0-9 are VK 0x30-0x39."""
+    assert resolve_vk("5") == 0x35
+
+
+def test_resolve_vk_table_name_is_case_insensitive():
+    assert resolve_vk("vk_home") == 0x24
+
+
+def test_resolve_vk_strips_surrounding_whitespace():
+    assert resolve_vk("  T  ") == 0x54
+
+
+def test_resolve_vk_letters_span_full_alphabet():
+    for i, ch in enumerate("ABCDEFGHIJKLMNOPQRSTUVWXYZ"):
+        assert resolve_vk(ch) == 0x41 + i
+
+
+def test_resolve_vk_rejects_unknown_name():
+    with pytest.raises(KeyError):
+        resolve_vk("NOT_A_KEY")
+
+
+def test_resolve_vk_rejects_empty():
+    with pytest.raises(KeyError):
+        resolve_vk("")
+
+
+def test_resolve_vk_rejects_multichar_non_vk():
+    with pytest.raises(KeyError):
+        resolve_vk("TAB")
+
+
+def test_resolve_vk_rejects_punctuation():
+    with pytest.raises(KeyError):
+        resolve_vk("+")
+
+
+def test_resolve_vk_error_names_the_offending_key():
+    """The message must be actionable — a bare KeyError('T') was the bug."""
+    with pytest.raises(KeyError, match="NOT_A_KEY"):
+        resolve_vk("NOT_A_KEY")
 
 
 # ---------------------------------------------------------------------------

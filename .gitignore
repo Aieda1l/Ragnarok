@@ -54,6 +54,9 @@ Thumbs.db
 # Claude Code local settings (machine-specific)
 .claude/settings.local.json
 
+# Claude Code session transcripts + subagent logs (local, not shared)
+.claude/projects/
+
 # Subagent-driven-development scratch ledger
 .superpowers/
 
