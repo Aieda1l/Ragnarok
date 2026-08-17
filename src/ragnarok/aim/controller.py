@@ -14,8 +14,7 @@ from __future__ import annotations
 import math
 
 from ragnarok.core.clock import now_ns
-from ragnarok.core.types import Tracks
-from ragnarok.aim.fov import aim_point
+from ragnarok.core.types import Team, Tracks
 from ragnarok.aim.head import resolve_aim_point
 from ragnarok.motion.shaper import NullShaper
 
@@ -76,25 +75,40 @@ class AimController:
         self._last_shot_ns: int = 0            # last recoil-advance time (full-auto pacing)
         self._was_firing: bool = False         # trigger-release edge -> reset spray
         self._cur_target: int | None = None
-        self.target_id: int | None = None
+        self.target_id: int | None = None          # aim lock (overlay / dynamic-ROI)
+        self.fire_target_id: int | None = None      # ENEMY under the crosshair (trigger)
+        self.aim_on: bool = False                    # live auto-aim toggle state (telemetry)
+        self.trigger_on: bool = False                # live trigger toggle state (telemetry)
 
     def update(self, tracks: Tracks, t_capture_ns: int) -> None:
         self._imm.prune({t.track_id for t in tracks})
 
-        if not (self._cfg.enabled and self._active()):
-            self._disengage()
+        # Read each toggle/key once per tick (a toggle closure is idempotent within
+        # a tick, but reusing the value keeps the state and the gate consistent).
+        aim_active = self._active()
+        trig_active = self._trigger_active()
+        self.aim_on = bool(self._cfg.enabled and aim_active)
+        self.trigger_on = bool(self._trigger is not None and trig_active)
+
+        # TRIGGER: evaluated every tick, independent of the aim key/toggle, so the
+        # trigger bot fires on crosshair-over-enemy whether or not auto-aim is on.
+        self._run_trigger(tracks, trig_active)
+
+        # AIM ASSIST: only while aim is enabled AND its toggle/key is active.
+        if not (self._cfg.enabled and aim_active):
+            self._disengage_aim()
             return
 
         tid = self._sel.select(tracks, self._cx, self._cy)
         self.target_id = tid
         if tid is None:
-            self._reset_stateful()
+            self._reset_aim_state()
             self._cur_target = None
             self._last_ns = t_capture_ns
             return
 
         if tid != self._cur_target:
-            self._reset_stateful()
+            self._reset_aim_state()
             self._cur_target = tid
 
         track = next((t for t in tracks if t.track_id == tid), None)
@@ -141,42 +155,74 @@ class AimController:
         dpx, dpy = self._aimer.step((chx, chy), lead_pt, dt, target_vel=(tvx, tvy))
         sx, sy = self._shaper.shape(dpx, dpy)
 
-        # trigger + recoil. A new press restarts the spray from shot 0; while the
-        # trigger is HELD and recoil.fire_rate_rps > 0 (full-auto), the pattern
-        # advances one shot every 1/rps seconds. rps == 0 stays semi-auto (one
-        # shot per press).
-        if self._trigger is not None:
-            fired = self._trigger.update(
-                track=track,
-                crosshair=(self._cx, self._cy),
-                occluded=track.time_since_update > 0,
-                enemy_confirmed=True,           # selector restricts to ENEMY
-                line_clear=self._line_clear(),
-                active=self._trigger_active(),
-            )
-            if self._recoil is not None:
-                now = self._clock()
-                rps = getattr(self._recoil, "fire_rate_rps", 0.0)
-                firing = self._trigger.is_firing
-                if self._was_firing and not firing:       # released -> reset the spray
-                    self._recoil.release()
-                if fired:                                  # a shot fired
-                    rx, ry = self._recoil.on_fire()
-                    sx += rx
-                    sy += ry
-                    self._last_shot_ns = now
-                elif rps > 0.0 and firing and now - self._last_shot_ns >= 1e9 / rps:
-                    rx, ry = self._recoil.on_fire()        # held full-auto -> next shot
-                    sx += rx
-                    sy += ry
-                    self._last_shot_ns = now
-                self._was_firing = firing
-
         k = self._deg_per_px / self._cfg.sensitivity   # px → mouse counts
         cdx, cdy = sx * k, sy * k
         self._mouse.move_relative(cdx, cdy)
         if self._cmd_buf is not None:
             self._cmd_buf.push(self._clock(), cdx, cdy)
+
+    # ------------------------------------------------------------------
+    # Trigger (independent of the aim key) + recoil
+    # ------------------------------------------------------------------
+    def _run_trigger(self, tracks: Tracks, active: bool) -> None:
+        """Fire when the crosshair sits inside an ENEMY hitbox, gated only by the
+        trigger's own activation. Runs every tick regardless of aim state, so the
+        trigger bot works with auto-aim off. Recoil counter-moves are emitted here
+        (as their own commanded move) so they also apply when aim is disengaged."""
+        if self._trigger is None:
+            self.fire_target_id = None
+            return
+        target = self._enemy_under_crosshair(tracks)
+        self.fire_target_id = target.track_id if target is not None else None
+        if target is None:
+            self._trigger.release()
+            if self._recoil is not None:
+                self._recoil.release()
+            self._was_firing = False
+            return
+        fired = self._trigger.update(
+            track=target,
+            crosshair=(self._cx, self._cy),
+            occluded=target.time_since_update > 0,
+            enemy_confirmed=True,           # crosshair-containment gate is ENEMY-only
+            line_clear=self._line_clear(),
+            active=active,
+        )
+        if self._recoil is not None:
+            rx, ry = self._recoil_delta(fired)
+            if rx or ry:
+                k = self._deg_per_px / self._cfg.sensitivity
+                cdx, cdy = rx * k, ry * k
+                self._mouse.move_relative(cdx, cdy)
+                if self._cmd_buf is not None:
+                    self._cmd_buf.push(self._clock(), cdx, cdy)
+
+    def _recoil_delta(self, fired: bool) -> tuple[float, float]:
+        """Per-tick recoil counter-move (px). A new press advances one shot; while
+        HELD with fire_rate_rps > 0 (full-auto) it advances one shot every 1/rps s;
+        rps == 0 stays semi-auto. Resets the spray on the fire-release edge."""
+        now = self._clock()
+        rps = getattr(self._recoil, "fire_rate_rps", 0.0)
+        firing = self._trigger.is_firing
+        rx = ry = 0.0
+        if self._was_firing and not firing:                # released -> reset spray
+            self._recoil.release()
+        if fired:                                          # a shot fired
+            rx, ry = self._recoil.on_fire()
+            self._last_shot_ns = now
+        elif rps > 0.0 and firing and now - self._last_shot_ns >= 1e9 / rps:
+            rx, ry = self._recoil.on_fire()                # held full-auto -> next shot
+            self._last_shot_ns = now
+        self._was_firing = firing
+        return rx, ry
+
+    def _enemy_under_crosshair(self, tracks: Tracks):
+        for t in tracks:
+            if t.team is Team.ENEMY:
+                x1, y1, x2, y2 = t.xyxy
+                if x1 <= self._cx <= x2 and y1 <= self._cy <= y2:
+                    return t
+        return None
 
     def _dt(self, t_ns: int) -> float:
         if self._last_ns is None:
@@ -186,19 +232,28 @@ class AimController:
         self._last_ns = t_ns
         return max(1e-3, min(0.1, dt))
 
-    def _reset_stateful(self) -> None:
-        self._aimer.reset()
+    def _reset_aim_state(self) -> None:
+        """Reset aim-assist state only (aimer/shaper/velocity). The trigger and
+        recoil are managed independently in _run_trigger, so a target switch or an
+        aim disengage never releases the trigger."""
+        if self._aimer is not None:
+            self._aimer.reset()
         self._shaper.reset()
         if self._vel is not None:
             self._vel.reset()
-        if self._trigger is not None:
-            self._trigger.release()
-        if self._recoil is not None:
-            self._recoil.release()
 
-    def _disengage(self) -> None:
-        self._reset_stateful()
+    def _disengage_aim(self) -> None:
+        self._reset_aim_state()
         self._sel.reset()
         self._last_ns = None
         self._cur_target = None
         self.target_id = None
+
+    def release(self) -> None:
+        """Release any held trigger button (and reset the spray). Called on hot-swap
+        so a held fire doesn't stick when this controller is replaced. Does NOT close
+        the mouse driver — that is owned and shared by the app."""
+        if self._trigger is not None:
+            self._trigger.release()
+        if self._recoil is not None:
+            self._recoil.release()

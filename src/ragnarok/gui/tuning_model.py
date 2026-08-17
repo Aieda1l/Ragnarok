@@ -37,6 +37,8 @@ AIM_FIELDS: tuple[FieldSpec, ...] = (
     FieldSpec("aim.kff", "Kff (feed-fwd)", "float", 0.0, 4.0, 0.05),
     FieldSpec("aim.max_step_px", "Max step (px)", "float", 1.0, 300.0, 1.0),
     FieldSpec("aim.creep_px", "Creep zone (px)", "float", 0.0, 100.0, 1.0),
+    FieldSpec("aim.commit", "Commit fraction", "float", 0.05, 1.0, 0.05),
+    FieldSpec("aim.settle_px", "Settle deadzone (px)", "float", 0.0, 20.0, 0.5),
     FieldSpec("aim.deadtime_ms", "Latency comp (ms)", "float", 0.0, 500.0, 5.0),
     FieldSpec("aim.pinhole", "Pinhole projection", "bool"),
     FieldSpec("aim.ema_alpha", "EMA alpha", "float", 0.01, 1.0, 0.01),
@@ -88,6 +90,7 @@ CLASSIFICATION_FIELDS: tuple[FieldSpec, ...] = (
 TRIGGER_FIELDS: tuple[FieldSpec, ...] = (
     FieldSpec("trigger.enabled", "Trigger bot enabled", "bool"),
     FieldSpec("trigger.activation_delay_ms", "Activation delay (ms)", "float", 0.0, 2000.0, 5.0),
+    FieldSpec("trigger.max_occlusion_frames", "Occlusion tolerance (frames)", "int", 0, 30, 1),
     FieldSpec("trigger.require_line_clear", "Require line clear", "bool"),
     FieldSpec("trigger.button", "Fire button", "choice", choices=("left", "right", "middle")),
 )
@@ -115,11 +118,13 @@ INPUT_FIELDS: tuple[FieldSpec, ...] = (
               choices=("sendinput", "arduino")),
     FieldSpec("input.compensate_ballistics", "Compensate ptr ballistics", "bool"),
     FieldSpec("arduino.transport", "Arduino transport", "choice",
-              choices=("serial", "udp")),
+              choices=("serial", "udp", "hid")),
     FieldSpec("arduino.port", "Serial port (COM/tty)", "text"),
     FieldSpec("arduino.baud", "Baud", "int", 1200, 2000000, 100),
     FieldSpec("arduino.host", "UDP host", "text"),
     FieldSpec("arduino.udp_port", "UDP port", "int", 0, 65535, 1),
+    FieldSpec("arduino.vid", "HID vendor id", "int", 0, 0xFFFF, 1),
+    FieldSpec("arduino.hid_pid", "HID product id", "int", 0, 0xFFFF, 1),
 )
 
 DETECTION_FIELDS: tuple[FieldSpec, ...] = (
@@ -137,9 +142,9 @@ OVERLAY_FIELDS: tuple[FieldSpec, ...] = (
 )
 
 KEYBIND_FIELDS: tuple[FieldSpec, ...] = (
-    FieldSpec("aim.aim_key", "Aim key (VK_ or char)", "text"),
+    FieldSpec("aim.aim_key", "Aim toggle key (VK_ or char)", "text"),
     FieldSpec("aim.toggle", "Aim = toggle (off = hold)", "bool"),
-    FieldSpec("trigger.trigger_key", "Trigger key (VK_ or char)", "text"),
+    FieldSpec("trigger.trigger_key", "Trigger toggle key (VK_ or char)", "text"),
     FieldSpec("calibration.reset_key", "Calib reset key (VK_)", "text"),
     FieldSpec("calibration.apply_key", "Calib set-sens key (VK_)", "text"),
 )

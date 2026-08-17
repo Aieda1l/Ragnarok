@@ -19,14 +19,17 @@ class TriggerBot:
         mouse,
         activation_delay_s: float,
         button: MouseButton = MouseButton.LEFT,
+        max_occlusion_frames: int = 0,
         clock=now_ns,
     ) -> None:
         self._mouse = mouse
         self._delay = activation_delay_s
         self._button = button
+        self._max_occ = max_occlusion_frames    # tolerate this many consecutive coasted frames
         self._clock = clock
         self._pressed = False
         self._eligible_since: int | None = None
+        self._occ_streak = 0
 
     @staticmethod
     def _inside(track, crosshair) -> bool:
@@ -44,10 +47,14 @@ class TriggerBot:
         line_clear: bool,
         active: bool,
     ) -> bool:
+        # Tolerate up to max_occlusion_frames consecutive coasted (occluded) frames
+        # so a single missed detection doesn't reset the eligibility timer. With the
+        # default 0, one occluded frame drops readiness (original `not occluded`).
+        self._occ_streak = self._occ_streak + 1 if occluded else 0
         ready = (
             active
             and enemy_confirmed
-            and not occluded
+            and self._occ_streak <= self._max_occ
             and line_clear
             and track is not None
             and self._inside(track, crosshair)
@@ -74,6 +81,7 @@ class TriggerBot:
 
     def release(self) -> None:
         self._eligible_since = None
+        self._occ_streak = 0
         self._release_if_pressed()
 
     def _release_if_pressed(self) -> None:
