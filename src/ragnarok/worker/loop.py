@@ -182,8 +182,10 @@ class WorkerLoop:
                 try:
                     self.tick()
                 except Exception:                # a hot-swap race / transient error
+                    import time
                     import traceback
                     import warnings
                     warnings.warn("worker tick failed:\n" + traceback.format_exc())
+                    time.sleep(0.05)
         finally:
             self._cap.stop()
