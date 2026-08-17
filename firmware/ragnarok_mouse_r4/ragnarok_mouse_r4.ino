@@ -129,6 +129,7 @@ void setup() {
 
 void loop() {
   Usb.Task();                                          // pump the real mouse (passthrough)
+  while (Serial.available() > 0) serialParser.feed((uint8_t)Serial.read());
   while (Serial1.available() > 0) serialParser.feed((uint8_t)Serial1.read());
   int32_t dx = inj_dx, dy = inj_dy; inj_dx = 0; inj_dy = 0;   // drain injected aim
   if (dx || dy) emitMove(dx, dy);
