@@ -64,21 +64,24 @@ def build_aimer(cfg: AppConfig):
         FlickAimer, FeedbackAimer, HybridAimer, PredictiveAimer,
     )
     if a.aimer == "flick":
-        return FlickAimer(flick_speed_px_s=a.flick_speed_px_s)
+        return FlickAimer(flick_speed_px_s=a.flick_speed_px_s, settle_px=a.settle_px)
     if a.aimer == "hybrid":
         return HybridAimer(
             kp=a.kp, max_step_px=a.max_step_px,
             flick_dist_px=a.hybrid_flick_dist_px,
             flick_speed_px_s=a.flick_speed_px_s, ema_alpha=a.ema_alpha,
+            commit=a.commit, settle_px=a.settle_px,
         )
     if a.aimer == "predictive":
-        return PredictiveAimer(max_step_px=a.max_step_px, kff=a.kff)
+        return PredictiveAimer(max_step_px=a.max_step_px, kff=a.kff,
+                               commit=a.commit, settle_px=a.settle_px)
     ki = a.ki if a.controller_mode in ("pi", "pid") else 0.0
     kd = a.kd if a.controller_mode == "pid" else 0.0
     return FeedbackAimer(
         kp=a.kp, max_step_px=a.max_step_px, ema_alpha=a.ema_alpha, kff=a.kff,
         ki=ki, kd=kd, integral_clamp=a.integral_clamp,
         cond_integ_thresh_px=a.cond_integ_thresh_px, creep_px=a.creep_px,
+        settle_px=a.settle_px,
     )
 
 

@@ -25,10 +25,13 @@ class DashboardPanel(QWidget):
         self.setMinimumHeight(160)
 
         layout = QVBoxLayout(self)
+        self.status_label = QLabel("AIM --   TRIGGER --")   # live toggle state (Phase 9P)
         self.fps_label = QLabel("FPS --")
         self.lat_label = QLabel("loop p50 -- ms  p99 -- ms")
+        self.status_label.setObjectName("mono")
         self.fps_label.setObjectName("mono")     # monospaced telemetry numerals (theme)
         self.lat_label.setObjectName("mono")
+        layout.addWidget(self.status_label)
         layout.addWidget(self.fps_label)
         layout.addWidget(self.lat_label)
         layout.addStretch(1)
@@ -45,9 +48,17 @@ class DashboardPanel(QWidget):
         self._last_seq = snap.seq
         self.history.push_snapshot(snap)
         s = self.history.stats()
+        self.status_label.setText(self._fmt_status(snap.aim_on, snap.trigger_on))
         self.fps_label.setText(f"FPS {s['fps']:.1f}")
         self.lat_label.setText(f"loop p50 {s['p50']:.1f} ms  p99 {s['p99']:.1f} ms")
         self.update()
+
+    @staticmethod
+    def _fmt_status(aim_on, trigger_on) -> str:
+        def chip(name: str, on) -> str:
+            color = theme.CYAN if on else theme.ALERT_RED
+            return f'{name} <span style="color:{color}">{"ON" if on else "OFF"}</span>'
+        return chip("AIM", bool(aim_on)) + "&nbsp;&nbsp;&nbsp;" + chip("TRIGGER", bool(trigger_on))
 
     def paintEvent(self, event) -> None:
         w = float(self.width())

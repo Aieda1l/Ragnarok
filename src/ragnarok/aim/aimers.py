@@ -23,6 +23,11 @@ import math
 from abc import ABC, abstractmethod
 
 
+def _settled(ex: float, ey: float, settle_px: float) -> bool:
+    """True when the crosshair is within the settle deadzone of the target."""
+    return settle_px > 0.0 and math.hypot(ex, ey) <= settle_px
+
+
 class Aimer(ABC):
     """Abstract base for all aimers.
 
@@ -86,8 +91,9 @@ class FlickAimer(Aimer):
     shrinks each frame so it settles onto the target instead of gliding open-loop.
     """
 
-    def __init__(self, *, flick_speed_px_s: float) -> None:
+    def __init__(self, *, flick_speed_px_s: float, settle_px: float = 0.0) -> None:
         self._speed: float = flick_speed_px_s
+        self._settle = settle_px
 
     def step(
         self,
@@ -98,6 +104,8 @@ class FlickAimer(Aimer):
     ) -> tuple[float, float]:
         ex = target_point[0] - crosshair[0]
         ey = target_point[1] - crosshair[1]
+        if _settled(ex, ey, self._settle):
+            return (0.0, 0.0)
         d = math.hypot(ex, ey)
         if d <= 1e-9:
             return (0.0, 0.0)
@@ -127,7 +135,7 @@ class FeedbackAimer(Aimer):
                  kff: float = 0.0, ki: float = 0.0, kd: float = 0.0,
                  integral_clamp: float | None = None,
                  cond_integ_thresh_px: float | None = None,
-                 creep_px: float = 0.0) -> None:
+                 creep_px: float = 0.0, settle_px: float = 0.0) -> None:
         self._kp = kp
         self._max = max_step_px
         self._alpha = ema_alpha
@@ -137,6 +145,7 @@ class FeedbackAimer(Aimer):
         self._iclamp = integral_clamp
         self._cond = cond_integ_thresh_px
         self._creep = creep_px          # >0: quadratic creep zone (NeuralBot-style)
+        self._settle = settle_px
         self._fx = 0.0
         self._fy = 0.0
         self._ix = 0.0
@@ -161,6 +170,10 @@ class FeedbackAimer(Aimer):
         dt: float,
         target_vel: tuple[float, float] = (0.0, 0.0),
     ) -> tuple[float, float]:
+        if _settled(target_point[0] - crosshair[0],
+                    target_point[1] - crosshair[1], self._settle):
+            return (0.0, 0.0)
+
         ex = target_point[0] - crosshair[0]
         ey = target_point[1] - crosshair[1]
 
@@ -251,12 +264,16 @@ class HybridAimer(Aimer):
         flick_dist_px: float,
         flick_speed_px_s: float,
         ema_alpha: float = 1.0,
+        commit: float = 1.0,
+        settle_px: float = 0.0,
     ) -> None:
         self._kp = kp
         self._max = max_step_px
         self._flick_dist = flick_dist_px
         self._speed = flick_speed_px_s
         self._alpha = ema_alpha
+        self._commit = commit
+        self._settle = settle_px
         self._fx = 0.0
         self._fy = 0.0
         self._initialized = False
@@ -276,11 +293,13 @@ class HybridAimer(Aimer):
         d = math.hypot(ex, ey)
         if d <= 1e-9:
             return (0.0, 0.0)
+        if _settled(ex, ey, self._settle):
+            return (0.0, 0.0)
 
         if d <= self._flick_dist:
-            # Close: snap the full remaining error (already <= flick_dist, no clamp needed).
+            # Close: snap the remaining error * commit (already <= flick_dist, no clamp needed).
             self._initialized = False  # next far-approach re-seeds the EMA
-            return (ex, ey)
+            return (ex * self._commit, ey * self._commit)
 
         # Far: smooth proportional approach.
         if not self._initialized:
@@ -298,7 +317,7 @@ class HybridAimer(Aimer):
             s = limit / mag
             dx *= s
             dy *= s
-        return (dx, dy)
+        return (dx * self._commit, dy * self._commit)
 
 
 # ---------------------------------------------------------------------------
@@ -310,13 +329,23 @@ class PredictiveAimer(Aimer):
 
     The controller feeds the IMM lead point as target_point and v̂ as
     target_vel. This aimer commands the full positional error to that predicted
-    point (no smoothing) plus kff * v̂ * dt, magnitude-clamped to max_step_px.
-    Best for fast, confidently-tracked targets where prediction beats damping.
+    point (no smoothing), clamped to the remaining distance so a blind full-error
+    re-issue each tick can't stack into overshoot (the bug this class used to
+    have — it only clamped to max_step_px, not remaining). kff * v̂ * dt is then
+    added ON TOP of the remaining-clamped positional step (not clamped to
+    remaining itself) so genuine velocity lead for a confidently-tracked target
+    still works even when the positional error is at/near zero (e.g. a target
+    moving steadily alongside the crosshair) — only the total is safety-capped
+    to max_step_px. Best for fast, confidently-tracked targets where prediction
+    beats damping.
     """
 
-    def __init__(self, *, max_step_px: float, kff: float = 1.0) -> None:
+    def __init__(self, *, max_step_px: float, kff: float = 1.0,
+                 commit: float = 1.0, settle_px: float = 0.0) -> None:
         self._max = max_step_px
         self._kff = kff
+        self._commit = commit
+        self._settle = settle_px
 
     def step(
         self,
@@ -327,11 +356,20 @@ class PredictiveAimer(Aimer):
     ) -> tuple[float, float]:
         ex = target_point[0] - crosshair[0]
         ey = target_point[1] - crosshair[1]
-        dx = ex + self._kff * target_vel[0] * dt
-        dy = ey + self._kff * target_vel[1] * dt
+        if _settled(ex, ey, self._settle):
+            return (0.0, 0.0)
+        remaining = math.hypot(ex, ey)
+        pos_limit = min(self._max, remaining)       # never re-issue past remaining OR max step
+        px, py = ex, ey
+        if remaining > pos_limit and remaining > 0.0:
+            s = pos_limit / remaining
+            px *= s
+            py *= s
+        dx = px + self._kff * target_vel[0] * dt
+        dy = py + self._kff * target_vel[1] * dt
         mag = math.hypot(dx, dy)
-        if mag > self._max and mag > 0.0:
+        if mag > self._max and mag > 0.0:            # total still safety-capped to max_step_px
             s = self._max / mag
             dx *= s
             dy *= s
-        return (dx, dy)
+        return (dx * self._commit, dy * self._commit)
