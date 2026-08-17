@@ -121,6 +121,8 @@ class HidTransport:  # pragma: no cover paths marked below — real device I/O i
         self._dev.set_nonblocking(1)
 
     def write(self, data: bytes) -> None:
+        if self._dev is None:
+            raise RuntimeError("HID device not opened; call open() before write()")
         if len(data) > self._len:
             # chunk oversized frames across reports (rare; a MOVE frame is small)
             for i in range(0, len(data), self._len):
