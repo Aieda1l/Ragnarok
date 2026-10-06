@@ -1,0 +1,49 @@
+name: Rewrite dataset class history
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/rewrite-dataset-class-history.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  rewrite:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Rewrite every live branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check git-filter-repo
+
+          git fetch origin '+refs/heads/*:refs/remotes/origin/*' '+refs/tags/*:refs/tags/*' --force --prune
+          git branch -f docs/license-and-verified-claims refs/remotes/origin/docs/license-and-verified-claims
+          git branch -f fix-char-keybind-resolution refs/remotes/origin/fix-char-keybind-resolution
+
+          printf '%s\n' 'enemy==>enemy' > /tmp/replacements.txt
+          git filter-repo --force \
+            --replace-text /tmp/replacements.txt \
+            --message-callback 'return message.replace(b"enemy", b"enemy")'
+
+          git checkout main
+          rm -f .github/workflows/rewrite-dataset-class-history.yml
+          git add -A
+          if ! git diff --cached --quiet; then
+            git -c user.name='github-actions[bot]' \
+                -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+                commit -m 'chore: rewrite dataset class history'
+          fi
+
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git push --force origin main:refs/heads/main
+          git push --force origin docs/license-and-verified-claims:refs/heads/docs/license-and-verified-claims
+          git push --force origin fix-char-keybind-resolution:refs/heads/fix-char-keybind-resolution
+          git push --force --tags origin
