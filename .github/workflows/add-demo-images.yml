@@ -1,0 +1,44 @@
+name: Add demo images
+
+on:
+  push:
+    branches:
+      - docs/license-and-verified-claims
+    paths:
+      - .github/workflows/add-demo-images.yml
+
+permissions:
+  contents: write
+
+jobs:
+  add-images:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Decode and commit README demo images
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p docs/images
+
+          cat .tmp/demo/ui.00 .tmp/demo/ui.01 | base64 --decode > docs/images/ragnarok-ui.webp
+          cat .tmp/demo/capture.00 .tmp/demo/capture.01 | base64 --decode > docs/images/ragnarok-capture.webp
+
+          printf '%s  %s\n' \
+            '6e94912b2de7df52c5a4714c30e465ef1db519ae4389eb99ef45e284520646b1' \
+            'docs/images/ragnarok-ui.webp' \
+            '2a4ac7125e3b6ef0098a07d9f92bd4d60d778dc48f1cc5d0bad70de38ee3b029' \
+            'docs/images/ragnarok-capture.webp' | sha256sum --check
+
+          rm -rf .tmp/demo
+          rm -f .github/workflows/add-demo-images.yml
+
+          git add -A
+          git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -m 'docs: add Ragnarok demo screenshots'
+          git push origin HEAD:docs/license-and-verified-claims
