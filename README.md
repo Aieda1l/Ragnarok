@@ -1,6 +1,6 @@
 # Ragnarok
 
-A vision-based aim system for a **self-authored, single-player, offline shooter sandbox**.
+A vision-based aim system demonstrated in a **single-player aim-training environment**.
 Everything it knows about the game comes from the screen: a TensorRT RF-DETR detector finds
 players in a centered ROI, a motion-only BoT-SORT tracker gives them stable identities, an HSV
 outline gate separates enemies from teammates, and a control loop turns the selected target's
@@ -11,8 +11,9 @@ interesting parts are the Smith predictor that kills dead-time rubber-banding, t
 ego-motion compensator, the relay/Nelder-Mead PID auto-tuner, and the USB-Host-Shield
 passthrough firmware.
 
-**Scope:** a closed environment — an offline game the author wrote, no other players, no online
-service. Everything here assumes that context.
+**Scope:** a closed, single-player training environment. The included in-game capture is from
+[SteelSeries 3D Aim Trainer](https://steelseries.com/gg/3daimtrainer), not a game authored by
+this repository's author. The demonstrated setup has no other players.
 
 ---
 
@@ -22,9 +23,9 @@ service. Everything here assumes that context.
 
 ![Ragnarok dashboard showing live detections, tracking overlay, and telemetry](docs/images/ragnarok-ui.webp)
 
-**In-game capture — click-through lock-on overlay over the sandbox**
+**In-game capture — click-through lock-on overlay over SteelSeries 3D Aim Trainer**
 
-![Ragnarok in-game capture showing the lock-on overlay](docs/images/ragnarok-capture.webp)
+![Ragnarok lock-on overlay over SteelSeries 3D Aim Trainer](docs/images/ragnarok-capture.webp)
 
 ---
 
