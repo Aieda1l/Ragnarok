@@ -16,11 +16,23 @@ service. Everything here assumes that context.
 
 ---
 
+## Demo
+
+**Ragnarok dashboard — live detection/tracking preview and performance telemetry**
+
+![Ragnarok dashboard showing live detections, tracking overlay, and telemetry](docs/images/ragnarok-ui.webp)
+
+**In-game capture — click-through lock-on overlay over the sandbox**
+
+![Ragnarok in-game capture showing the lock-on overlay](docs/images/ragnarok-capture.webp)
+
+---
+
 ## Status
 
 | | |
 |---|---|
-| Tests | **754 passing** (`pytest`, no GPU / no hardware required) |
+| Tests | **766 passing** (`pytest`, no GPU / no hardware required) |
 | Detector | RF-DETR-Small, locally trained — val **mAP@50 0.843**, **mAP@50:95 0.564** (epoch 98, merged-dataset val split; [`docs/results/`](docs/results/)) |
 | Throughput | **~131 FPS** `detect()` on an RTX 3090 via TensorRT (7.6 ms mean, 9.2 ms p99; [`docs/results/detect_latency.json`](docs/results/detect_latency.json)). Torch FP16 and CPU figures are unmeasured in the repo. |
 | Platform | Windows 11 + NVIDIA (capture, SendInput and raw-input paths are Win32) |
@@ -286,7 +298,7 @@ edit in the Renesas core needed for the driverless raw-HID transport).
 ## Development
 
 ```powershell
-uv run pytest                 # 754 tests
+uv run pytest                 # 766 tests
 ```
 
 The whole suite is CI-safe: no GPU, no game, no MCU, no network. That is deliberate — every
@@ -317,7 +329,7 @@ src/ragnarok/
 firmware/          three .ino sketches (R4 passthrough, ESP32 bridge, 32u4 legacy)
 scripts/           training and calibration tools
 docs/superpowers/  design spec + per-phase implementation plans
-tests/             754 tests
+tests/             766 tests
 ```
 
 ### Design docs
