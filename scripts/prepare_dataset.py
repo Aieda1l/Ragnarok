@@ -1,7 +1,7 @@
 """Merge the two YOLO datasets under dataset/ into one COCO dataset for RF-DETR.
 
-- Reconciles classes to {0: enemy, 1: enemy_head}; drops the unused
-  ``enemy`` class from dataset 2.
+- Reconciles classes to {0: enemy, 1: enemy_head}; drops an unused
+  source class from dataset 2.
 - Converts YOLO (class cx cy w h, normalized) -> COCO (bbox x,y,w,h absolute px).
 - Splits into train/valid/test (80/10/10) and writes ``_annotations.coco.json``
   per split (the layout RF-DETR's train() expects).
@@ -22,7 +22,7 @@ DATASET = Path("dataset")
 # source subfolder -> {yolo_class: canonical_class}. Classes not listed are dropped.
 SOURCES = {
     "dataset 1": {0: 0, 1: 1},          # ['enemy', 'enemy_head']
-    "dataset 2": {1: 0, 2: 1},          # ['enemy'(drop), 'enemy', 'enemy_head']
+    "dataset 2": {1: 0, 2: 1},          # class 0 dropped; class 1='enemy', class 2='enemy_head'
 }
 CATEGORIES = [                          # COCO is 1-indexed: canonical c -> category_id c+1
     {"id": 1, "name": "enemy", "supercategory": "none"},
@@ -78,7 +78,7 @@ def main():
                 if len(p) != 5:
                     continue
                 c = int(p[0])
-                if c not in remap:            # drop unused classes (enemy)
+                if c not in remap:            # drop unused source classes
                     continue
                 cx, cy, bw, bh = (float(v) for v in p[1:])
                 x, y, ww, hh = (cx - bw / 2) * w, (cy - bh / 2) * h, bw * w, bh * h
