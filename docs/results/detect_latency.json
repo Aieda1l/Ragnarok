@@ -1,0 +1,22 @@
+{
+  "engine": "engines/rfdetr-trained.engine",
+  "roi_px": 384,
+  "frame_source": "dataset1_clip2--107-_jpg.rf.8dcc57a3f0f1b9b9c17319836d4295ee.jpg",
+  "warmup": 50,
+  "iters": 1000,
+  "latency_ms": {
+    "mean": 7.6263895991723984,
+    "p50": 7.566649990621954,
+    "p99": 9.210399934090674,
+    "max": 10.446199914440513
+  },
+  "fps_from_p50": 132.15888157102444,
+  "fps_from_mean": 131.12364468090092,
+  "env": {
+    "gpu": "NVIDIA GeForce RTX 3090",
+    "tensorrt": "11.1.0.106",
+    "torch": "2.12.1+cu130",
+    "python": "3.12.9",
+    "os": "Windows-11-10.0.26200-SP0"
+  }
+}

@@ -4,7 +4,7 @@
 
 - **Repository:** https://github.com/NirAharon/BoT-SORT
 - **Commit:** `251985436d6712aaf682aaaf5f71edb4987224bd` (2022-10-30)
-- **License:** MIT (see upstream `LICENSE`)
+- **License:** MIT, Copyright (c) 2022 Nir Aharon — text in [`LICENSE-BoT-SORT`](LICENSE-BoT-SORT) (must stay with these files)
 - **Files adapted:** `tracker/bot_sort.py`, `tracker/kalman_filter.py`,
   `tracker/basetrack.py`, `tracker/matching.py`
 

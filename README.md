@@ -21,8 +21,8 @@ service. Everything here assumes that context.
 | | |
 |---|---|
 | Tests | **754 passing** (`pytest`, no GPU / no hardware required) |
-| Detector | RF-DETR-Small, locally trained — val **mAP@50 ≈ 0.85**, **mAP@50:95 ≈ 0.56** |
-| Throughput | **~152 FPS** detect on an RTX 3090 via TensorRT (~50 FPS torch FP16, ~0.2 FPS on CPU) |
+| Detector | RF-DETR-Small, locally trained — val **mAP@50 0.843**, **mAP@50:95 0.564** (epoch 98, merged-dataset val split; [`docs/results/`](docs/results/)) |
+| Throughput | **~131 FPS** `detect()` on an RTX 3090 via TensorRT (7.6 ms mean, 9.2 ms p99; [`docs/results/detect_latency.json`](docs/results/detect_latency.json)). Torch FP16 and CPU figures are unmeasured in the repo. |
 | Platform | Windows 11 + NVIDIA (capture, SendInput and raw-input paths are Win32) |
 
 ---
@@ -140,10 +140,10 @@ uv pip install torch torchvision --index-url https://download.pytorch.org/whl/cu
   --index-strategy unsafe-best-match
 
 uv pip install rfdetr                # detector
-uv pip install tensorrt-cu13 onnx onnxscript   # optional: TensorRT backend (~152 FPS)
+uv pip install tensorrt-cu13 onnx onnxscript   # optional: TensorRT backend (~131 FPS)
 ```
 
-Verify CUDA actually landed — a CPU-only torch wheel is the difference between 150 FPS and 0.2:
+Verify CUDA actually landed — a CPU-only torch wheel is the difference between a GPU-speed detector and one that crawls:
 
 ```powershell
 uv run python -c "import torch; print(torch.cuda.is_available())"
@@ -279,6 +279,7 @@ edit in the Renesas core needed for the driverless raw-HID transport).
 | `measure_latency.py` | Wall optical-flow round-trip latency → dead time + τ_render |
 | `learn_recoil.py` | Spray at a wall → per-shot recoil pattern |
 | `measure_hil.py` | PC↔MCU round-trip latency over the Arduino DIAG echo |
+| `bench_detect.py` | TensorRT `detect()` latency → `docs/results/detect_latency.json` |
 
 ---
 
@@ -329,5 +330,7 @@ tests/             754 tests
 ## Third-party
 
 The tracker core is vendored from **MIT-licensed `NirAharon/BoT-SORT`** (not AGPL BoxMOT), with
-ReID, CMC and `lap` removed. RF-DETR is used in its Apache-2.0 variants only. Aimer taxonomy
+ReID, CMC and `lap` removed. Its copyright and license text are in
+[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) and
+[`src/ragnarok/tracking/_vendor/LICENSE-BoT-SORT`](src/ragnarok/tracking/_vendor/LICENSE-BoT-SORT). RF-DETR is used in its Apache-2.0 variants only. Aimer taxonomy
 (flick / feedback / hybrid / trigger) follows `AccessViolationEnjoyer/NeuralBot`.
