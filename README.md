@@ -334,3 +334,10 @@ ReID, CMC and `lap` removed. Its copyright and license text are in
 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) and
 [`src/ragnarok/tracking/_vendor/LICENSE-BoT-SORT`](src/ragnarok/tracking/_vendor/LICENSE-BoT-SORT). RF-DETR is used in its Apache-2.0 variants only. Aimer taxonomy
 (flick / feedback / hybrid / trigger) follows `AccessViolationEnjoyer/NeuralBot`.
+
+---
+
+## License
+
+MIT — see [`LICENSE`](LICENSE). Vendored third-party code keeps its own license; see
+[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
