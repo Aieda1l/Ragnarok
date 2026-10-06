@@ -1,0 +1,48 @@
+name: Purge repository history
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/purge-history.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  purge:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Rewrite all branch history
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check git-filter-repo
+
+          git fetch origin '+refs/heads/*:refs/remotes/origin/*' --force --prune
+
+          git filter-repo --force \
+            --path 'Ragnarok.txt' \
+            --path 'dataset/' \
+            --invert-paths
+
+          rm -f .github/workflows/purge-history.yml
+          git add -A
+          if ! git diff --cached --quiet; then
+            git -c user.name='github-actions[bot]' \
+                -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+                commit -m 'chore: purge Ragnarok.txt and dataset history'
+          fi
+
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+
+          git push --force origin HEAD:refs/heads/main
+          for b in docs/license-and-verified-claims fix-char-keybind-resolution; do
+            git push --force origin "refs/remotes/origin/$b:refs/heads/$b"
+          done
